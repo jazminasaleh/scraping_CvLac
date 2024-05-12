@@ -6,14 +6,11 @@ from bs4 import BeautifulSoup, SoupStrainer
 import csv
 import os
 from concurrent.futures import ThreadPoolExecutor
-import pycountry
-
 
 
 # Desactivar las advertencias de solicitudes inseguras (solo para pruebas)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-codigo_espanol = pycountry.languages.get(name='Spanish').alpha_3
-codigo_ingles = pycountry.languages.get(name='English').alpha_3
+
 # Configurar una estrategia de reintentos personalizada
 retry_strategy = Retry(
     total=5,
@@ -34,10 +31,36 @@ os.environ['http_proxy'] = ''
 os.environ['https_proxy'] = ''
 
 # URL del GrupLac, se toman los 152 grupos
-url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=4'
+url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=152'
 
 # Los resultados se van a almacenar en un csv con nombre resultados_grupos
 archivo_salida = 'resultados_grupos.csv'
+
+paises_espanol = [
+    "Afganistán", "Albania", "Alemania", "Andorra", "Angola", "Antigua y Barbuda", "Arabia Saudita", "Argelia",
+    "Argentina", "Armenia", "Australia", "Austria", "Azerbaiyán", "Bahamas", "Bangladés", "Barbados", "Baréin",
+    "Bélgica", "Belice", "Benín", "Bielorrusia", "Birmania", "Bolivia", "Bosnia y Herzegovina", "Botsuana",
+    "Brasil", "Brunéi", "Bulgaria", "Burkina Faso", "Burundi", "Bután", "Cabo Verde", "Camboya", "Camerún",
+    "Canadá", "Catar", "Chad", "Chile", "China", "Chipre", "Ciudad del Vaticano", "Colombia", "Comoras", "Corea del Norte",
+    "Corea del Sur", "Costa de Marfil", "Costa Rica", "Croacia", "Cuba", "Dinamarca", "Dominica", "Ecuador", "Egipto",
+    "El Salvador", "Emiratos Árabes Unidos", "Eritrea", "Eslovaquia", "Eslovenia", "España", "Estados Unidos",
+    "Estonia", "Etiopía", "Filipinas", "Finlandia", "Fiyi", "Francia", "Gabón", "Gambia", "Georgia", "Ghana",
+    "Granada", "Grecia", "Guatemala", "Guyana", "Guinea", "Guinea ecuatorial", "Guinea-Bisáu", "Haití", "Honduras",
+    "Hungría", "India", "Indonesia", "Irak", "Irán", "Irlanda", "Islandia", "Islas Marshall", "Islas Salomón",
+    "Israel", "Italia", "Jamaica", "Japón", "Jordania", "Kazajistán", "Kenia", "Kirguistán", "Kiribati", "Kuwait",
+    "Laos", "Lesoto", "Letonia", "Líbano", "Liberia", "Libia", "Liechtenstein", "Lituania", "Luxemburgo", "Macedonia del Norte",
+    "Madagascar", "Malasia", "Malaui", "Maldivas", "Malí", "Malta", "Marruecos", "Mauricio", "Mauritania", "México",
+    "Micronesia", "Moldavia", "Mónaco", "Mongolia", "Montenegro", "Mozambique", "Namibia", "Nauru", "Nepal",
+    "Nicaragua", "Níger", "Nigeria", "Noruega", "Nueva Zelanda", "Omán", "Países Bajos", "Pakistán", "Palaos",
+    "Panamá", "Papúa Nueva Guinea", "Paraguay", "Perú", "Polonia", "Portugal", "Reino Unido", "República Centroafricana",
+    "República Checa", "República del Congo", "República Democrática del Congo", "República Dominicana",
+    "República Sudafricana", "Ruanda", "Rumania", "Rusia", "Samoa", "San Cristóbal y Nieves", "San Marino",
+    "San Vicente y las Granadinas", "Santa Lucía", "Santo Tomé y Príncipe", "Senegal", "Serbia", "Seychelles",
+    "Sierra Leona", "Singapur", "Siria", "Somalia", "Sri Lanka", "Suazilandia", "Sudán", "Sudán del Sur", "Suecia",
+    "Suiza", "Surinam", "Tailandia", "Tanzania", "Tayikistán", "Timor Oriental", "Togo", "Tonga", "Trinidad y Tobago",
+    "Túnez", "Turkmenistán", "Turquía", "Tuvalu", "Ucrania", "Uganda", "Uruguay", "Uzbekistán", "Vanuatu",
+    "Venezuela", "Vietnam", "Yemen", "Yibuti", "Zambia", "Zimbabue"
+]
 
 # Función para extrear la informcaión de los grupos y sus investigadores
 def procesar_grupo(fila):
@@ -120,14 +143,17 @@ def procesar_grupo(fila):
                                             categoria = categoria_td.find_next('td').text.strip()
                                             categoria = ' '.join(categoria.split()) #quitar los espacios adicionales
                                         # Buscar la sección de "Artículos"
-                                        seccion_articulos = table_cvlac.find('h3', string=['Artículos','Libros','Capitulos de libro'])
+                                        seccion_articulos = table_cvlac.find('h3', string=['Artículos','Libros','Capitulos de libro', 'Textos en publicaciones no científicas'])
                                         if seccion_articulos:
+                                            tipo_producto = seccion_articulos.text
                                             # Encontrar la fila (tr) siguiente después de la sección "Artículos"
                                             fila_articulos = seccion_articulos.find_parent('tr').find_next_sibling('tr')
-
+                                           
+                                            
                                             # Extraer los artículos de la segunda fila (tr)
                                             while fila_articulos:
                                                 celdas_articulos = fila_articulos.find_all('td')
+                                               
                                                 
                                                 #Dentro de blockquote es donde se encuentra toda la informacion del articulo
                                                 if celdas_articulos:
@@ -140,10 +166,10 @@ def procesar_grupo(fila):
                                                             texto_articulo=elemento.find('b')
                                                             if texto_articulo:
                                                                 tipo_articulo = texto_articulo.get_text().split(' - ')[-1]
-                                                                print(tipo_articulo)
+                                                               
                                                             else:
                                                                 tipo_articulo = "Capítulo de Libro"
-                                                                print("Hola mundo")
+                                                               
                                                             img_tag = elemento.find('img')
                                                             estado = 'Vigente' if img_tag else 'No Vigente'
                                                     #Obtener los datos del articulo
@@ -155,19 +181,40 @@ def procesar_grupo(fila):
                                                             #Obtener titulo del articulo
                                                             if indice_comilla2 != -1:
                                                                 titulo_articulo = texto_blockquote[indice_comilla1 + 1:indice_comilla2]
-                                                                indice_pais = texto_blockquote.find(". En:")
-                                                                #Obtener pais del articulo
+                                                                indice_pais = texto_blockquote.find("En:")
                                                                 if indice_pais != -1:
-                                                                    indice_palabra_despues_de_en = indice_pais + len(". En:")
-                                                                    palabra_despues_de_en = ""
-                                                                    for i in range(indice_palabra_despues_de_en,
-                                                                                   len(texto_blockquote)):
-                                                                        if texto_blockquote[i].isalpha() or texto_blockquote[i] == " ":
-                                                                            palabra_despues_de_en += texto_blockquote[i]
+                                                                    indice_palabra_despues_de_en = indice_pais + len("En:")
+                                                                    palabras = []
+                                                                    palabra_actual = ""
+                                                                    for i in range(indice_palabra_despues_de_en, len(texto_blockquote)):
+                                                                        if texto_blockquote[i].isalnum() or (texto_blockquote[i] == "." and palabra_actual):
+                                                                            palabra_actual += texto_blockquote[i]
+                                                                        elif texto_blockquote[i] in [","]:
+                                                                            palabras.append(palabra_actual)
+                                                                            palabra_actual = ""
+                                                                            if len(palabras) == 3:
+                                                                                break
+                                                                        elif texto_blockquote[i] == " ":
+                                                                            if palabra_actual:
+                                                                                palabras.append(palabra_actual)
+                                                                                palabra_actual = ""
+                                                                            else:
+                                                                                continue
                                                                         else:
                                                                             break
-                                                                    pais = palabra_despues_de_en.strip()
 
+                                                                    # Validar si las primeras letras coinciden con un país
+                                                                    paises_validos = [pais.lower() for pais in paises_espanol]
+                                                                    pais_encontrado = False
+                                                                    for pais_valido in paises_validos:
+                                                                        nombre_pais = " ".join(palabras[:3]).lower()
+                                                                        if nombre_pais == pais_valido or nombre_pais.startswith(pais_valido + " ") or nombre_pais.startswith(pais_valido):
+                                                                            pais = pais_valido.capitalize()
+                                                                            pais_encontrado = True
+                                                                            break
+                                                                    if not pais_encontrado:
+                                                                        pais = ""
+                                                               
                                                                 #Obtener ISSN del articulo
                                                                 indice_issn = texto_blockquote.find("ISSN:")
                                                                 indice_ed = texto_blockquote.find("ed", indice_issn)
@@ -199,9 +246,12 @@ def procesar_grupo(fila):
                                                                 #Obtener Volumen del articulo
                                                                 indice_v = texto_blockquote.find("v.", indice_issn)
                                                                 indice_fasc = texto_blockquote.find("fasc.", indice_v)
+                                                                indice_palabras_clave = texto_blockquote.find("Palabras:", indice_v)
                                                                 if indice_v != -1:
                                                                     if indice_fasc != -1:
                                                                         volumen = texto_blockquote[indice_v + len("v."):indice_fasc].strip()
+                                                                    elif indice_palabras_clave != -1:
+                                                                        volumen = texto_blockquote[indice_v + len("v."):indice_palabras_clave].strip()
                                                                     else:
                                                                         volumen = texto_blockquote[indice_v + len("v."):].strip()
                                                                     if not volumen.isdigit():
@@ -237,6 +287,26 @@ def procesar_grupo(fila):
                                                                 else:
                                                                     palabras = [] # Deja las palabras en blanco si no se encuentra "Palabras:"
                                                                 
+                                                                #Obtener areas
+                                                                indice_areas = texto_blockquote.find("Areas:")
+                                                                if indice_areas != -1:
+                                                                    indice_sectores = texto_blockquote.find("Sectores:", indice_areas)
+                                                                    if indice_sectores != -1:
+                                                                        areas_texto = texto_blockquote[indice_areas + len("Areas:"):indice_sectores].strip()
+                                                                    else:
+                                                                        areas_texto = texto_blockquote[indice_areas + len("Areas:"):].strip()
+                                                                    areas = [area.strip() for area in areas_texto.split(",") if area.strip()]
+                                                                else:
+                                                                    areas = [] # Deja las áreas en blanco si no se encuentra "Areas:"
+
+                                                                # Obtener sectores del artículo
+                                                                indice_sectores = texto_blockquote.find("Sectores:")
+                                                                if indice_sectores != -1:
+                                                                    sectores_texto = texto_blockquote[indice_sectores + len("Sectores:"):].strip()
+                                                                    sectores = [sector.strip() for sector in sectores_texto.split(",") if sector.strip()]
+                                                                else:
+                                                                    sectores = [] # Deja los sectores en blanco si no se encuentra "Sectores:"
+
                                                                 nombres_integrantes = texto_blockquote[:indice_comilla1].split(',')
                                                                 nombres_integrantes_limpios=[]
                                                                 for nombre in nombres_integrantes:
@@ -251,16 +321,16 @@ def procesar_grupo(fila):
                                                                         continue
                                                                     nombre_limpio=nombre[:indice_tipo].strip()
                                                                     nombres_integrantes_limpios.append(nombre_limpio)
-                                                                    print(nombres_integrantes_limpios)
+                                                                   
 
                                                                 articulo_existente = next((a for a in articulos if a[0] == titulo_articulo), None)
                                                                                                                               
-                                                                if articulo_existente:
+                                                                if articulo_existente is not None:
                                                                     # Si el artículo ya está en la lista, agregar los nuevos integrantes
                                                                     articulo_existente[1].extend([nombre for nombre in nombres_integrantes_limpios if nombre not in articulo_existente[1]])
                                                                 else:
                                                                     # Si el artículo no está en la lista, agregarlo
-                                                                    articulos.append((titulo_articulo, nombres_integrantes_limpios, tipo_articulo, estado, pais, issn, editorial, volumen, fasciculo, palabras))
+                                                                    articulos.append((titulo_articulo, nombres_integrantes_limpios,  tipo_producto, tipo_articulo, estado, pais, issn, editorial, volumen, fasciculo, palabras, areas, sectores))
                                                                    
                                                 #Va al siguinete articulo                
                                                 fila_articulos = fila_articulos.find_next_sibling('tr')
@@ -295,10 +365,10 @@ try:
     # Abrir el archivo de salida en modo de escritura
     with open(archivo_salida, 'w', newline='', encoding='utf-8') as csvfile:
         writer = csv.writer(csvfile)
-        #El nombre de las columnas en el csv
-        writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Nombre del líder', 'Enlace al CvLac líder', 'Nombre del integrante', 'Enlace al CvLac del investigador', 'Nombre en citaciones', 'Nacionalidad', 'Sexo', 'Categoría', 'Título Artículo', 'Integrantes involucrados', 'Tipo Artículo', 'Estado', 'País', 'ISSN', 'Editorial', 'Volumen', 'Fascículo', 'Palabras clave'])
+        # El nombre de las columnas en el CSV
+        writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Nombre del líder', 'Enlace al CvLac líder', 'Nombre del integrante', 'Enlace al CvLac del investigador', 'Nombre en citaciones', 'Nacionalidad', 'Sexo', 'Categoría', 'Título publicación', 'Integrantes involucrados', 'Tipo producto', 'Tipo publicación', 'Estado', 'País', 'ISSN', 'Editorial', 'Volumen', 'Fascículo', 'Palabras clave', 'Areas', 'Sextores'])
 
-        # Crear hilos para procesar los grupos 
+        # Crear hilos para procesar los grupos
         with ThreadPoolExecutor() as executor:
             # Mapear la función procesar_grupo a cada fila de la tabla
             resultados = list(executor.map(procesar_grupo, filas))
@@ -306,18 +376,11 @@ try:
             for datos in resultados:
                 if datos:
                     grupo, enlace_grupo, lider, cvlac_lider, integrantes = datos
-                    writer.writerow([grupo, enlace_grupo, lider, cvlac_lider, '', '', '', '', '', ''])
                     for integrante in integrantes:
                         nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, articulos = integrante
-                        writer.writerow(['', '', '', '', nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, ''])
-                        if articulos:
-                            for articulo in articulos:
-                                titulo_articulo,nombres_integrantes, tipo_articulo, estado, pais, issn, editorial, volumen,fasciculo, palabras = articulo
-                                writer.writerow(['', '', '', '', '', '', '', '', '', '', titulo_articulo, nombres_integrantes, tipo_articulo, estado, pais, issn, editorial, volumen, fasciculo, palabras])
-                        else:
-                            writer.writerow(['', '', '', '', '', '', '', '', '', ''])
-
-    print("Resultados almacenados en", archivo_salida)
+                        for articulo in articulos:
+                            titulo_articulo, nombres_integrantes, tipo_producto, tipo_articulo, estado, pais, issn, editorial, volumen, fasciculo, palabras, areas, sectores = articulo
+                            writer.writerow([grupo, enlace_grupo, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, titulo_articulo, nombres_integrantes, tipo_producto, tipo_articulo, estado, pais, issn, editorial, volumen, fasciculo, palabras, areas, sectores])
 
 except requests.exceptions.ConnectionError as e:
     print("Error de conexión:", e)
