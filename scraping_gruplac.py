@@ -6,10 +6,14 @@ from bs4 import BeautifulSoup, SoupStrainer
 import csv
 import os
 from concurrent.futures import ThreadPoolExecutor
+import pycountry
+
+
 
 # Desactivar las advertencias de solicitudes inseguras (solo para pruebas)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
+codigo_espanol = pycountry.languages.get(name='Spanish').alpha_3
+codigo_ingles = pycountry.languages.get(name='English').alpha_3
 # Configurar una estrategia de reintentos personalizada
 retry_strategy = Retry(
     total=5,
@@ -30,7 +34,7 @@ os.environ['http_proxy'] = ''
 os.environ['https_proxy'] = ''
 
 # URL del GrupLac, se toman los 152 grupos
-url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=152'
+url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=4'
 
 # Los resultados se van a almacenar en un csv con nombre resultados_grupos
 archivo_salida = 'resultados_grupos.csv'
@@ -116,7 +120,7 @@ def procesar_grupo(fila):
                                             categoria = categoria_td.find_next('td').text.strip()
                                             categoria = ' '.join(categoria.split()) #quitar los espacios adicionales
                                         # Buscar la sección de "Artículos"
-                                        seccion_articulos = table_cvlac.find('h3', string='Artículos')
+                                        seccion_articulos = table_cvlac.find('h3', string=['Artículos','Libros','Capitulos de libro'])
                                         if seccion_articulos:
                                             # Encontrar la fila (tr) siguiente después de la sección "Artículos"
                                             fila_articulos = seccion_articulos.find_parent('tr').find_next_sibling('tr')
@@ -133,11 +137,15 @@ def procesar_grupo(fila):
                                                      # Obtener estado y tipo de articulo
                                                     if elementos_li:
                                                         for elemento in elementos_li:
-                                                            texto_articulo = elemento.find('b').text.strip()
+                                                            texto_articulo=elemento.find('b')
+                                                            if texto_articulo:
+                                                                tipo_articulo = texto_articulo.get_text().split(' - ')[-1]
+                                                                print(tipo_articulo)
+                                                            else:
+                                                                tipo_articulo = "Capítulo de Libro"
+                                                                print("Hola mundo")
                                                             img_tag = elemento.find('img')
                                                             estado = 'Vigente' if img_tag else 'No Vigente'
-                                                            tipo_articulo = texto_articulo.split(' - ')[-1]
-
                                                     #Obtener los datos del articulo
                                                     if elementos_blockquote:
                                                         texto_blockquote = elementos_blockquote.get_text(strip=True)
@@ -152,13 +160,14 @@ def procesar_grupo(fila):
                                                                 if indice_pais != -1:
                                                                     indice_palabra_despues_de_en = indice_pais + len(". En:")
                                                                     palabra_despues_de_en = ""
-                                                                    for i in range(indice_palabra_despues_de_en, len(texto_blockquote)):
+                                                                    for i in range(indice_palabra_despues_de_en,
+                                                                                   len(texto_blockquote)):
                                                                         if texto_blockquote[i].isalpha() or texto_blockquote[i] == " ":
                                                                             palabra_despues_de_en += texto_blockquote[i]
                                                                         else:
                                                                             break
                                                                     pais = palabra_despues_de_en.strip()
-                                                            
+
                                                                 #Obtener ISSN del articulo
                                                                 indice_issn = texto_blockquote.find("ISSN:")
                                                                 indice_ed = texto_blockquote.find("ed", indice_issn)
@@ -229,15 +238,29 @@ def procesar_grupo(fila):
                                                                     palabras = [] # Deja las palabras en blanco si no se encuentra "Palabras:"
                                                                 
                                                                 nombres_integrantes = texto_blockquote[:indice_comilla1].split(',')
-                                                                nombres_integrantes = [nombre.strip() for nombre in nombres_integrantes if nombre.strip()] 
-                                                                articulo_existente = next((a for a in articulos if a[0] == titulo_articulo), None) 
+                                                                nombres_integrantes_limpios=[]
+                                                                for nombre in nombres_integrantes:
+                                                                    indice_tipo_capitulo= nombre.find("Tipo: Capítulo de libro")
+                                                                    indice_tipo_otro_capitulo=nombre.find("Tipo: Otro capítulo de libro publicado")
+                                                                    if indice_tipo_capitulo != -1:
+                                                                        indice_tipo=indice_tipo_capitulo
+                                                                    elif indice_tipo_otro_capitulo !=-1:
+                                                                        indice_tipo=indice_tipo_otro_capitulo
+                                                                    else:
+                                                                        nombres_integrantes_limpios.append(nombre.strip())
+                                                                        continue
+                                                                    nombre_limpio=nombre[:indice_tipo].strip()
+                                                                    nombres_integrantes_limpios.append(nombre_limpio)
+                                                                    print(nombres_integrantes_limpios)
+
+                                                                articulo_existente = next((a for a in articulos if a[0] == titulo_articulo), None)
                                                                                                                               
                                                                 if articulo_existente:
                                                                     # Si el artículo ya está en la lista, agregar los nuevos integrantes
-                                                                    articulo_existente[1].extend([nombre for nombre in nombres_integrantes if nombre not in articulo_existente[1]])
+                                                                    articulo_existente[1].extend([nombre for nombre in nombres_integrantes_limpios if nombre not in articulo_existente[1]])
                                                                 else:
                                                                     # Si el artículo no está en la lista, agregarlo
-                                                                    articulos.append((titulo_articulo, nombres_integrantes, tipo_articulo, estado, pais, issn, editorial, volumen, fasciculo, palabras))
+                                                                    articulos.append((titulo_articulo, nombres_integrantes_limpios, tipo_articulo, estado, pais, issn, editorial, volumen, fasciculo, palabras))
                                                                    
                                                 #Va al siguinete articulo                
                                                 fila_articulos = fila_articulos.find_next_sibling('tr')
@@ -273,7 +296,7 @@ try:
     with open(archivo_salida, 'w', newline='', encoding='utf-8') as csvfile:
         writer = csv.writer(csvfile)
         #El nombre de las columnas en el csv
-        writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Nombre del líder', 'Enlace al CvLac líder', 'Nombre del integrante', 'Enlace al CvLav del investigador', 'Nombre en citaciones', 'Nacionalidad', 'Sexo', 'Categoría', 'Título Artículo', 'Integrantes involucrados', 'Tipo Artículo', 'Estado', 'País', 'ISSN', 'Editorial', 'Volumen', 'Fascículo', 'Palabras clave'])
+        writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Nombre del líder', 'Enlace al CvLac líder', 'Nombre del integrante', 'Enlace al CvLac del investigador', 'Nombre en citaciones', 'Nacionalidad', 'Sexo', 'Categoría', 'Título Artículo', 'Integrantes involucrados', 'Tipo Artículo', 'Estado', 'País', 'ISSN', 'Editorial', 'Volumen', 'Fascículo', 'Palabras clave'])
 
         # Crear hilos para procesar los grupos 
         with ThreadPoolExecutor() as executor:
@@ -290,7 +313,7 @@ try:
                         if articulos:
                             for articulo in articulos:
                                 titulo_articulo,nombres_integrantes, tipo_articulo, estado, pais, issn, editorial, volumen,fasciculo, palabras = articulo
-                                writer.writerow(['', '', '', '', '', '', '', '', '', titulo_articulo, nombres_integrantes, tipo_articulo, estado, pais, issn, editorial, volumen, fasciculo, palabras])
+                                writer.writerow(['', '', '', '', '', '', '', '', '', '', titulo_articulo, nombres_integrantes, tipo_articulo, estado, pais, issn, editorial, volumen, fasciculo, palabras])
                         else:
                             writer.writerow(['', '', '', '', '', '', '', '', '', ''])
 
