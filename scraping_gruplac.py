@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup, SoupStrainer
 import csv
 import os
 from concurrent.futures import ThreadPoolExecutor
-
+import re
 
 # Desactivar las advertencias de solicitudes inseguras (solo para pruebas)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -275,6 +275,24 @@ def procesar_grupo(fila):
                                                                 else:
                                                                     fasciculo = ""
 
+                                                                # Obtener año de publicación
+                                                                indices_comas = [m.start() for m in re.finditer(r',', texto_blockquote)]
+                                                                indices_puntos = [m.start() for m in re.finditer(r'. ', texto_blockquote)]
+                                                                año = ""
+
+                                                                for i in range(len(indices_comas) - 1):
+                                                                    posible_año = texto_blockquote[indices_comas[i] + 1:indices_comas[i + 1]].strip()
+                                                                    if posible_año.isdigit() and len(posible_año) == 4:
+                                                                        año = posible_año
+                                                                        break
+
+                                                                if not año:
+                                                                    for indice_punto in indices_puntos:
+                                                                        posible_año = texto_blockquote[indice_punto + 2:indice_punto + 6]
+                                                                        if posible_año.isdigit():
+                                                                            año = posible_año
+                                                                            break
+                                                                
                                                                 #Obtener palabras claves del articulo
                                                                 indice_palabras = texto_blockquote.find("Palabras:")
                                                                 if indice_palabras != -1:
@@ -283,9 +301,10 @@ def procesar_grupo(fila):
                                                                         palabras_texto = texto_blockquote[indice_palabras + len("Palabras:"):indice_sectores].strip()
                                                                     else:
                                                                         palabras_texto = texto_blockquote[indice_palabras + len("Palabras:"):].strip()
-                                                                    palabras = [palabra.strip() for palabra in palabras_texto.split(",") if palabra.strip()]
+                                                                    palabras_limpio = [palabra.strip() for palabra in palabras_texto.split(",") if palabra.strip()]
+                                                                    palabras = ', '.join(palabras_limpio)
                                                                 else:
-                                                                    palabras = [] # Deja las palabras en blanco si no se encuentra "Palabras:"
+                                                                    palabras = "" # Deja las palabras en blanco si no se encuentra "Palabras:"
                                                                 
                                                                 #Obtener areas
                                                                 indice_areas = texto_blockquote.find("Areas:")
@@ -295,42 +314,59 @@ def procesar_grupo(fila):
                                                                         areas_texto = texto_blockquote[indice_areas + len("Areas:"):indice_sectores].strip()
                                                                     else:
                                                                         areas_texto = texto_blockquote[indice_areas + len("Areas:"):].strip()
-                                                                    areas = [area.strip() for area in areas_texto.split(",") if area.strip()]
+                                                                    areas_limpio = [area.strip() for area in areas_texto.split(",") if area.strip()]
+                                                                    areas = ', '.join(areas_limpio)
                                                                 else:
-                                                                    areas = [] # Deja las áreas en blanco si no se encuentra "Areas:"
+                                                                    areas = "" # Deja las áreas en blanco si no se encuentra "Areas:"
+                                                                
 
                                                                 # Obtener sectores del artículo
                                                                 indice_sectores = texto_blockquote.find("Sectores:")
                                                                 if indice_sectores != -1:
                                                                     sectores_texto = texto_blockquote[indice_sectores + len("Sectores:"):].strip()
-                                                                    sectores = [sector.strip() for sector in sectores_texto.split(",") if sector.strip()]
+                                                                     # Limpiar y dividir los sectores
+                                                                    sectores_limpio = [sector.strip() for sector in sectores_texto.split(",") if sector.strip()]
+                                                                    sectores = ', '.join(sectores_limpio)
                                                                 else:
-                                                                    sectores = [] # Deja los sectores en blanco si no se encuentra "Sectores:"
+                                                                    sectores = "" # Deja los sectores en blanco si no se encuentra "Sectores:"
 
                                                                 nombres_integrantes = texto_blockquote[:indice_comilla1].split(',')
-                                                                nombres_integrantes_limpios=[]
-                                                                for nombre in nombres_integrantes:
-                                                                    indice_tipo_capitulo= nombre.find("Tipo: Capítulo de libro")
-                                                                    indice_tipo_otro_capitulo=nombre.find("Tipo: Otro capítulo de libro publicado")
-                                                                    if indice_tipo_capitulo != -1:
-                                                                        indice_tipo=indice_tipo_capitulo
-                                                                    elif indice_tipo_otro_capitulo !=-1:
-                                                                        indice_tipo=indice_tipo_otro_capitulo
-                                                                    else:
-                                                                        nombres_integrantes_limpios.append(nombre.strip())
-                                                                        continue
-                                                                    nombre_limpio=nombre[:indice_tipo].strip()
-                                                                    nombres_integrantes_limpios.append(nombre_limpio)
-                                                                   
+                                                                nombres_integrantes_limpios = []
 
+                                                                for nombre in nombres_integrantes:
+                                                                    indice_tipo_capitulo = nombre.find("Tipo: Capítulo de libro")
+                                                                    indice_tipo_otro_capitulo = nombre.find("Tipo: Otro capítulo de libro publicado")
+                                                                    
+                                                                    if indice_tipo_capitulo != -1:
+                                                                        indice_tipo = indice_tipo_capitulo
+                                                                    elif indice_tipo_otro_capitulo != -1:
+                                                                        indice_tipo = indice_tipo_otro_capitulo
+                                                                    else:
+                                                                        nombre_limpio = re.sub(r"['\\]", '', nombre.strip())
+                                                                        if nombre_limpio:
+                                                                            nombres_integrantes_limpios.append(nombre_limpio)
+                                                                        continue
+                                                                    
+                                                                    nombre_limpio = re.sub(r"['\\]", '', nombre[:indice_tipo].strip())
+                                                                    nombres_integrantes_limpios.append(nombre_limpio)
+                                                                    
+
+                                                                nombres_integrantes_str = ', '.join(nombres_integrantes_limpios)
+                                                                nombres_integrantes_lista = nombres_integrantes_str.split(',')
+                                                                
+                                                               
                                                                 articulo_existente = next((a for a in articulos if a[0] == titulo_articulo), None)
                                                                                                                               
                                                                 if articulo_existente is not None:
-                                                                    # Si el artículo ya está en la lista, agregar los nuevos integrantes
-                                                                    articulo_existente[1].extend([nombre for nombre in nombres_integrantes_limpios if nombre not in articulo_existente[1]])
+                                                                    if isinstance(articulo_existente[1], list):
+                                                                        articulo_existente[1].extend([nombre for nombre in nombres_integrantes_lista if nombre.strip() and nombre.strip() not in articulo_existente[1]])
+                                                                    else:
+                                                                        # Si articulo_existente[1] no es una lista, puedes crear una nueva lista con los nombres anteriores y los nuevos
+                                                                        articulo_existente = list(articulo_existente)
+                                                                        articulo_existente[1] = articulo_existente[1].split(', ') + [nombre for nombre in nombres_integrantes_lista if nombre.strip() and nombre.strip() not in articulo_existente[1]]
                                                                 else:
                                                                     # Si el artículo no está en la lista, agregarlo
-                                                                    articulos.append((titulo_articulo, nombres_integrantes_limpios,  tipo_producto, tipo_articulo, estado, pais, issn, editorial, volumen, fasciculo, palabras, areas, sectores))
+                                                                    articulos.append((titulo_articulo, nombres_integrantes_str,  tipo_producto, tipo_articulo, estado, pais, issn, editorial, volumen, fasciculo, año, palabras, areas, sectores))
                                                                    
                                                 #Va al siguinete articulo                
                                                 fila_articulos = fila_articulos.find_next_sibling('tr')
@@ -366,7 +402,7 @@ try:
     with open(archivo_salida, 'w', newline='', encoding='utf-8') as csvfile:
         writer = csv.writer(csvfile)
         # El nombre de las columnas en el CSV
-        writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Nombre del líder', 'Enlace al CvLac líder', 'Nombre del integrante', 'Enlace al CvLac del investigador', 'Nombre en citaciones', 'Nacionalidad', 'Sexo', 'Categoría', 'Título publicación', 'Integrantes involucrados', 'Tipo producto', 'Tipo publicación', 'Estado', 'País', 'ISSN', 'Editorial', 'Volumen', 'Fascículo', 'Palabras clave', 'Areas', 'Sextores'])
+        writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Nombre del líder', 'Enlace al CvLac líder', 'Nombre del integrante', 'Enlace al CvLac del investigador', 'Nombre en citaciones', 'Nacionalidad', 'Sexo', 'Categoría', 'Título publicación', 'Integrantes involucrados', 'Tipo producto', 'Tipo publicación', 'Estado', 'País', 'ISSN', 'Editorial', 'Volumen', 'Fascículo', 'Año publicación', 'Palabras clave', 'Areas', 'Sectores'])
 
         # Crear hilos para procesar los grupos
         with ThreadPoolExecutor() as executor:
@@ -379,8 +415,10 @@ try:
                     for integrante in integrantes:
                         nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, articulos = integrante
                         for articulo in articulos:
-                            titulo_articulo, nombres_integrantes, tipo_producto, tipo_articulo, estado, pais, issn, editorial, volumen, fasciculo, palabras, areas, sectores = articulo
-                            writer.writerow([grupo, enlace_grupo, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, titulo_articulo, nombres_integrantes, tipo_producto, tipo_articulo, estado, pais, issn, editorial, volumen, fasciculo, palabras, areas, sectores])
+                            titulo_articulo, nombres_integrantes, tipo_producto, tipo_articulo, estado, pais, issn, editorial, volumen, fasciculo, año, palabras, areas, sectores = articulo
+                            writer.writerow([grupo, enlace_grupo, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, titulo_articulo, nombres_integrantes, tipo_producto, tipo_articulo, estado, pais, issn, editorial, volumen, fasciculo, año, palabras, areas, sectores])
+    
+    print("Resultados almacenados en", archivo_salida)
 
 except requests.exceptions.ConnectionError as e:
     print("Error de conexión:", e)
