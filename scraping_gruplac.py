@@ -59,7 +59,7 @@ paises_espanol = [
     "Sierra Leona", "Singapur", "Siria", "Somalia", "Sri Lanka", "Suazilandia", "Sudán", "Sudán del Sur", "Suecia",
     "Suiza", "Surinam", "Tailandia", "Tanzania", "Tayikistán", "Timor Oriental", "Togo", "Tonga", "Trinidad y Tobago",
     "Túnez", "Turkmenistán", "Turquía", "Tuvalu", "Ucrania", "Uganda", "Uruguay", "Uzbekistán", "Vanuatu",
-    "Venezuela", "Vietnam", "Yemen", "Yibuti", "Zambia", "Zimbabue"
+    "Venezuela", "Vietnam", "Yemen", "Yibuti", "Zambia", "Zimbabue", "No Aplica"
 ]
 
 # Función para extrear la informcaión de los grupos y sus investigadores
@@ -127,7 +127,7 @@ def procesar_grupo(fila):
                                     categoria = ''
                                     nacionalidad = ''
                                     sexo = ''
-                                    articulos= []
+                                    publicaciones= []
 
                                     # Obtener nombre de cada investigador en citaciones, nacionalidad, sexo y categoría
                                     for table_cvlac in tables_cvlac:
@@ -146,36 +146,37 @@ def procesar_grupo(fila):
                                         if categoria_td:
                                             categoria = categoria_td.find_next('td').text.strip()
                                             categoria = ' '.join(categoria.split()) #quitar los espacios adicionales
-                                        # Buscar la sección de "Artículos"
-                                        seccion_articulos = table_cvlac.find('h3', string=['Artículos','Libros','Capitulos de libro', 'Textos en publicaciones no científicas'])
-                                        if seccion_articulos:
-                                            tipo_producto = seccion_articulos.text
+                                        
+                                        # Buscar la sección de 'Artículos','Libros','Capitulos de libro', 'Textos en publicaciones no científicas'
+                                        seccion_publicacion = table_cvlac.find('h3', string=['Artículos','Libros','Capitulos de libro', 'Textos en publicaciones no científicas'])
+                                        if seccion_publicacion:
+                                            tipo_producto = seccion_publicacion.text
                                             # Encontrar la fila (tr) siguiente después de la sección "Artículos"
-                                            fila_articulos = seccion_articulos.find_parent('tr').find_next_sibling('tr')
+                                            fila_publicacion = seccion_publicacion.find_parent('tr').find_next_sibling('tr')
                                            
                                             
                                             # Extraer los artículos de la segunda fila (tr)
-                                            while fila_articulos:
-                                                celdas_articulos = fila_articulos.find_all('td')
+                                            while fila_publicacion:
+                                                celdas_publicacion = fila_publicacion.find_all('td')
                                                
                                                 
-                                                #Dentro de blockquote es donde se encuentra toda la informacion del articulo
-                                                if celdas_articulos:
-                                                    elementos_blockquote = celdas_articulos[0].find('blockquote')
-                                                    elementos_li = celdas_articulos[0].find_all('li')
+                                                #Dentro de blockquote es donde se encuentra toda la informacion de las publicaciones de nuevo conocimiento
+                                                if celdas_publicacion:
+                                                    elementos_blockquote = celdas_publicacion[0].find('blockquote')
+                                                    elementos_li = celdas_publicacion[0].find_all('li')
 
-                                                     # Obtener estado y tipo de articulo
+                                                     # Obtener estado y tipo de publicacion
                                                     if elementos_li:
                                                         for elemento in elementos_li:
-                                                            texto_articulo=elemento.find('b')
-                                                            tipo_articulo = ''
-                                                            if texto_articulo:
-                                                                tipo_articulo = texto_articulo.get_text().split(' - ')[-1]
+                                                            texto_publicacion=elemento.find('b')
+                                                            tipo_publicacion = ''
+                                                            if texto_publicacion:
+                                                                tipo_publicacion = texto_publicacion.get_text().split(' - ')[-1]
                                                             else:
-                                                                tipo_articulo = "Capítulo de Libro"
+                                                                tipo_publicacion = "Capítulo de Libro"
                                                             img_tag = elemento.find('img')
                                                             estado = 'Vigente' if img_tag else 'No Vigente'
-                                                    #Obtener los datos del articulo
+                                                    #Obtener los datos de la publicación de nuevo conocimiento
                                                     titulo_revista = ""
                                                     if elementos_blockquote:
                                                         texto_blockquote = elementos_blockquote.get_text(strip=True)
@@ -184,10 +185,10 @@ def procesar_grupo(fila):
                                                         indice_comilla1 = texto_blockquote.find('"')
                                                         if indice_comilla1 != -1:
                                                             indice_comilla2 = texto_blockquote.find('"', indice_comilla1 + 1)
-                                                            #Obtener titulo del articulo
+                                                            #Obtener titulo de la publicación
                                                             if indice_comilla2 != -1:
-                                                                titulo_articulo = texto_blockquote[indice_comilla1 + 1:indice_comilla2]
-                                                                tipo_articulo = tipo_articulo.title()
+                                                                titulo_publicacion = texto_blockquote[indice_comilla1 + 1:indice_comilla2]
+                                                                tipo_publicacion = tipo_publicacion.title()
                                                                 indice_pais = texto_blockquote.find("En:")
                                                                 if indice_pais != -1:
                                                                     indice_palabra_despues_de_en = indice_pais + len("En:")
@@ -210,40 +211,82 @@ def procesar_grupo(fila):
                                                                                 continue
                                                                         else:
                                                                             break
-                                                                    # Validar si las primeras letras coinciden con un país
+                                                                    
                                                                     #Obtener el pais
                                                                     paises_validos = [pais.lower() for pais in paises_espanol]
                                                                     pais_encontrado = False
                                                                     titulo_revista = ""
                                                                     for pais_valido in paises_validos:
                                                                         nombre_pais = " ".join(palabras[:3]).lower()
+                                                                        
                                                                         if nombre_pais == pais_valido or nombre_pais.startswith(pais_valido + " ") or nombre_pais.startswith(pais_valido):
                                                                             pais = pais_valido.capitalize()
-                                                                            #Obtener el titulo de la revista donde se público el articulo
-                                                                            if len(pais) > 1 and tipo_producto == "Artículos":
-                                                                                indice_final_pais = texto_blockquote.find("En:") + len(pais) + 4
-                                                                                indice_issn = texto_blockquote.find("ISSN:")
-                                                                                texto_despues_pais = texto_blockquote[indice_final_pais:indice_issn]
-                                                                                if len(texto_despues_pais) > 1:
-                                                                                    titulo_revista = texto_despues_pais
-                                                                                else:
-                                                                                    titulo_revista = ""
-                                                                            elif len(pais) > 1 and tipo_producto == "Textos en publicaciones no científicas":
-                                                                                indice_final_pais = texto_blockquote.find("En:") + len(pais) + 12
-                                                                                indice_issn = texto_blockquote.find("ISSN:") -1
-                                                                                if indice_issn != -1:
-                                                                                    titulo_revista = texto_blockquote[indice_final_pais:indice_issn].strip()
-                                                                                else:
-                                                                                    titulo_revista = ""
-                                                                            else:
-                                                                                titulo_revista = ""
+                                                                           
                                                                             pais_encontrado = True
                                                                             break
                                                                     if not pais_encontrado:
                                                                         pais = ""
                                                                     
+                                                                    #Obtener el titulo de la revista donde se público el articulo o Textos en publicaciones no científicas y el pais en caso que no se haya obtennido antes
+                                                                    if tipo_producto == "Artículos":
+                                                                        # Suponiendo que 'pais' y 'texto_blockquote' ya están definidos anteriormente
+                                                                        if len(pais) == 0:
+                                                                            indice_final_pais = texto_blockquote.find("En:") + 3
+                                                                            indice_issn = texto_blockquote.find("ISSN:")
+                                                                            
+                                                                            # Verificamos que se han encontrado las posiciones
+                                                                            if indice_final_pais != -1 and indice_issn != -1:
+                                                                                texto_despues_pais = texto_blockquote[indice_final_pais:indice_issn]
+                                                                                texto_despues_pais = texto_despues_pais.lstrip()  # Eliminar espacios al principio
+                                                                                
+                                                                                # Convertimos a minúsculas los nombres de los países válidos
+                                                                                paises_validos = [p.lower() for p in paises_espanol]
+                                                                                pais_encontrado = False
+                                                                                
+                                                                                for pais_valido in paises_validos:
+                                                                                    # Convertimos el texto a minúsculas para comparación
+                                                                                    nombre_pais = texto_despues_pais.lower()
+                                                                                    
+                                                                                    # Verificamos si el texto coincide con algún país válido
+                                                                                    if nombre_pais == pais_valido or nombre_pais.startswith(pais_valido + " ") or nombre_pais.startswith(pais_valido):
+                                                                                        pais = pais_valido.capitalize()  # Capitalizamos el nombre del país encontrado
+                                                                                        pais_encontrado = True
+                                                                                        break
+                                                                                
+                                                                                if not pais_encontrado:
+                                                                                    pais = ""
+                                                                            else:
+                                                                                pais = ""
+
+                                                                                
+                                                                            if len(texto_despues_pais) > 1:
+                                                                                titulo_revista = texto_despues_pais.replace(pais, "").strip()
+                                                                                if titulo_revista.startswith("No Aplica"):
+                                                                                    titulo_revista = titulo_revista[9:].strip()
+                                                                            else:
+                                                                                titulo_revista = ""
+                                                                        else:
+                                                                            indice_final_pais = texto_blockquote.find("En:") + len(pais) + 4
+                                                                            indice_issn = texto_blockquote.find("ISSN:")
+                                                                            texto_despues_pais = texto_blockquote[indice_final_pais:indice_issn]
+                                                                            if len(texto_despues_pais) > 1:
+                                                                                titulo_revista = texto_despues_pais.replace(pais, "").strip()
+                                                                            else:
+                                                                                titulo_revista = ""
+                                                                                                                                                    
+                                                                    elif  tipo_producto == "Textos en publicaciones no científicas":
+                                                                        indice_final_pais = texto_blockquote.find("En:") + len(pais) + 12
+                                                                        indice_issn = texto_blockquote.find("ISSN:") -1
+                                                                        if indice_issn != -1:
+                                                                            titulo_revista = texto_blockquote[indice_final_pais:indice_issn].strip()
+                                                                        else:
+                                                                            titulo_revista = ""
+                                                                    else:
+                                                                        titulo_revista = ""
+                                                                    
                                                                 issn = ''
-                                                                #Obtener ISSN del articulo
+
+                                                                #Obtener ISSN del articulo o textos en publicaciones no cinetificas
                                                                 indice_issn = texto_blockquote.find("ISSN:")
                                                                 indice_ed = texto_blockquote.find("ed", indice_issn)
                                                                 indice_p = texto_blockquote.find("p.", indice_issn)
@@ -260,7 +303,7 @@ def procesar_grupo(fila):
                                                                     else:
                                                                         issn = texto_blockquote[indice_issn + len("ISSN:"):].strip()   
                                                                 
-                                                                #Obtener editorial del articulo
+                                                                #Obtener editorial
                                                                 indice_ed = texto_blockquote.find("ed:", indice_issn)
                                                                 indice_v = texto_blockquote.find("v.", indice_ed)
                                                                 if indice_ed != -1:
@@ -271,7 +314,7 @@ def procesar_grupo(fila):
                                                                 else:
                                                                     editorial = ""  # Deja la editorial en blanco si no se encuentra "ed:"
                                                                 
-                                                                #Obtener Volumen del articulo
+                                                                #Obtener Volumen 
                                                                 indice_v = texto_blockquote.find("v.", indice_issn)
                                                                 indice_fasc = texto_blockquote.find("fasc.", indice_v)
                                                                 indice_palabras_clave = texto_blockquote.find("Palabras:", indice_v)
@@ -287,7 +330,7 @@ def procesar_grupo(fila):
                                                                 else:
                                                                     volumen = ""  # Deja el volumen en blanco si no se encuentra "v."
                                                                 
-                                                                #Obtener fasciculo del articulo
+                                                                #Obtener fasciculo 
                                                                 indice_fasc = texto_blockquote.find("fasc.", indice_v)
                                                                 indice_p = texto_blockquote.find("p.", indice_fasc)
                                                                 if indice_fasc != -1:
@@ -304,13 +347,8 @@ def procesar_grupo(fila):
                                                                     fasciculo = ""
 
                                                                 # Obtener el número de pagina
-                                                                # Expresión regular para buscar el número de página
                                                                 patron_pagina = r'(?:pages?|p\.)\s*(\d+)\s*-\s*(\d+)'
-
-                                                                # Buscar la coincidencia en el texto
                                                                 resultado_pagina = re.search(patron_pagina, texto_blockquote)
-
-                                                                # Verificar si se encontró una coincidencia y extraer el número de página
                                                                 if resultado_pagina:
                                                                     numero_pagina_inicio = resultado_pagina.group(1)
                                                                     numero_pagina_final = resultado_pagina.group(2)
@@ -353,7 +391,7 @@ def procesar_grupo(fila):
                                                                 else:
                                                                     doi = ""
 
-                                                                #Obtener palabras claves del articulo
+                                                                #Obtener palabras claves de la publicacion
                                                                 indice_palabras = texto_blockquote.find("Palabras:")
                                                                 if indice_palabras != -1:
                                                                     indice_sectores = texto_blockquote.find("Sectores:", indice_palabras)
@@ -393,6 +431,7 @@ def procesar_grupo(fila):
                                                                 nombres_integrantes = texto_blockquote[:indice_comilla1].split(',')
                                                                 nombres_integrantes_limpios = []
 
+                                                                # Obtener integrantes 
                                                                 for nombre in nombres_integrantes:
                                                                     indice_tipo_capitulo = nombre.find("Tipo: Capítulo de libro")
                                                                     indice_tipo_otro_capitulo = nombre.find("Tipo: Otro capítulo de libro publicado")
@@ -417,24 +456,24 @@ def procesar_grupo(fila):
                                                                 nombres_integrantes_lista = nombres_integrantes_str.split(',')
                                                                 
                                                                
-                                                                articulo_existente = next((a for a in articulos if a[0] == titulo_articulo), None)
+                                                                publicacion_existente = next((a for a in publicaciones if a[0] == titulo_publicacion), None)
                                                                                                                               
-                                                                if articulo_existente is not None:
-                                                                    if isinstance(articulo_existente[1], list):
-                                                                        articulo_existente[1].extend([nombre for nombre in nombres_integrantes_lista if nombre.strip() and nombre.strip() not in articulo_existente[1]])
+                                                                if publicacion_existente is not None:
+                                                                    if isinstance(publicacion_existente[1], list):
+                                                                        publicacion_existente[1].extend([nombre for nombre in nombres_integrantes_lista if nombre.strip() and nombre.strip() not in publicacion_existente[1]])
                                                                     else:
-                                                                        # Si articulo_existente[1] no es una lista, puedes crear una nueva lista con los nombres anteriores y los nuevos
-                                                                        articulo_existente = list(articulo_existente)
-                                                                        articulo_existente[1] = articulo_existente[1].split(', ') + [nombre for nombre in nombres_integrantes_lista if nombre.strip() and nombre.strip() not in articulo_existente[1]]
+                                                                        # Si publicacion_existente[1] no es una lista, puedes crear una nueva lista con los nombres anteriores y los nuevos
+                                                                        publicacion_existente = list(publicacion_existente)
+                                                                        publicacion_existente[1] = publicacion_existente[1].split(', ') + [nombre for nombre in nombres_integrantes_lista if nombre.strip() and nombre.strip() not in publicacion_existente[1]]
                                                                 else:
                                                                     # Si el artículo no está en la lista, agregarlo
-                                                                    articulos.append((titulo_articulo, nombres_integrantes_str,  tipo_producto, tipo_articulo, estado, pais, titulo_revista, issn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores))
+                                                                   publicaciones.append((titulo_publicacion, nombres_integrantes_str,  tipo_producto, tipo_publicacion, estado, pais, titulo_revista, issn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores))
                                                                    
-                                                #Va al siguinete articulo                
-                                                fila_articulos = fila_articulos.find_next_sibling('tr')
+                                                #Va a la siguinete publicacion               
+                                                fila_publicacion = fila_publicacion.find_next_sibling('tr')
                                                
                                     # Agregar los datos del integrante y sus artículos a la lista
-                                    integrantes.append([nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, articulos])
+                                    integrantes.append([nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria,publicaciones])
 
                                 except requests.exceptions.RequestException:
                                     # En caso de error en la solicitud HTTP
@@ -476,10 +515,10 @@ try:
                     grupo, enlace_grupo, lider, cvlac_lider, integrantes = datos
                     for integrante in integrantes:
                         if len(integrante) == 7:
-                            nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, articulos = integrante
-                            for articulo in articulos:
-                                titulo_articulo, nombres_integrantes, tipo_producto, tipo_articulo, estado, pais,titulo_revista, issn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores = articulo
-                                writer.writerow([grupo, enlace_grupo, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, titulo_articulo, nombres_integrantes, tipo_producto, tipo_articulo, estado, pais, titulo_revista, issn, editorial, volumen, fasciculo, paginas,año, doi, palabras, areas, sectores])
+                            nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria,publicaciones = integrante
+                            for publicacion in publicaciones:
+                                titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais,titulo_revista, issn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores = publicacion
+                                writer.writerow([grupo, enlace_grupo, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista, issn, editorial, volumen, fasciculo, paginas,año, doi, palabras, areas, sectores])
     
     print("Resultados almacenados en", archivo_salida)
 
