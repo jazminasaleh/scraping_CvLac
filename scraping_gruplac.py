@@ -31,7 +31,7 @@ os.environ['http_proxy'] = ''
 os.environ['https_proxy'] = ''
 
 # URL del GrupLac, se toman los 152 grupos
-url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=2'
+url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=152'
 
 # Los resultados se van a almacenar en un csv con nombre resultados_grupos
 archivo_salida = 'resultados_grupos.csv'
@@ -82,6 +82,8 @@ def procesar_grupo(fila):
 
             # Obtener el nombre del líder y el enlace a su CvLac
             nombre_lider = columnas[3].text.strip()
+            #Solo deja la primera letra en mayuscula
+            nombre_lider = nombre_lider.title()
             cvlac_lider = ''
             enlace_lider = columnas[3].find('a')
             if enlace_lider:
@@ -95,7 +97,7 @@ def procesar_grupo(fila):
             try:
                 response_grupo = session.get(enlace_gruplac_grupo)
                 response_grupo.raise_for_status()
-                soup_grupo = BeautifulSoup(response_grupo.text, 'lxml', parse_only=SoupStrainer('table'))
+                soup_grupo = BeautifulSoup(response_grupo.text, 'html.parser', from_encoding='utf-8')
 
                 tables = soup_grupo.find_all('table')
 
@@ -110,12 +112,14 @@ def procesar_grupo(fila):
                             enlaces_integrantes = tercer_tr.find_all('a')
                             for enlace_integrante in enlaces_integrantes:
                                 nombre_integrante = enlace_integrante.text.strip()
+                                #Solo deja la primera letra en mayuscula
+                                nombre_integrante = nombre_integrante.title()
                                 enlace_cvlac_integrante = enlace_integrante.get('href')
 
                                 try:
                                     response_cvlac_integrante = session.get(enlace_cvlac_integrante)
                                     response_cvlac_integrante.raise_for_status()
-                                    soup_cvlac_integrante = BeautifulSoup(response_cvlac_integrante.text, 'lxml', parse_only=SoupStrainer('table'))
+                                    soup_cvlac_integrante = BeautifulSoup(response_cvlac_integrante.text,  'html.parser', from_encoding='utf-8')
 
                                     tables_cvlac = soup_cvlac_integrante.find_all('table')
 
@@ -174,15 +178,16 @@ def procesar_grupo(fila):
                                                     #Obtener los datos del articulo
                                                     titulo_revista = ""
                                                     if elementos_blockquote:
-                                                       
                                                         texto_blockquote = elementos_blockquote.get_text(strip=True)
                                                         texto_blockquote = " ".join(texto_blockquote.split()) 
+                                                       
                                                         indice_comilla1 = texto_blockquote.find('"')
                                                         if indice_comilla1 != -1:
                                                             indice_comilla2 = texto_blockquote.find('"', indice_comilla1 + 1)
                                                             #Obtener titulo del articulo
                                                             if indice_comilla2 != -1:
                                                                 titulo_articulo = texto_blockquote[indice_comilla1 + 1:indice_comilla2]
+                                                                tipo_articulo = tipo_articulo.title()
                                                                 indice_pais = texto_blockquote.find("En:")
                                                                 if indice_pais != -1:
                                                                     indice_palabra_despues_de_en = indice_pais + len("En:")
@@ -221,6 +226,13 @@ def procesar_grupo(fila):
                                                                                 texto_despues_pais = texto_blockquote[indice_final_pais:indice_issn]
                                                                                 if len(texto_despues_pais) > 1:
                                                                                     titulo_revista = texto_despues_pais
+                                                                                else:
+                                                                                    titulo_revista = ""
+                                                                            elif len(pais) > 1 and tipo_producto == "Textos en publicaciones no científicas":
+                                                                                indice_final_pais = texto_blockquote.find("En:") + len(pais) + 12
+                                                                                indice_issn = texto_blockquote.find("ISSN:") -1
+                                                                                if indice_issn != -1:
+                                                                                    titulo_revista = texto_blockquote[indice_final_pais:indice_issn].strip()
                                                                                 else:
                                                                                     titulo_revista = ""
                                                                             else:
@@ -291,6 +303,20 @@ def procesar_grupo(fila):
                                                                 else:
                                                                     fasciculo = ""
 
+                                                                # Obtener el número de pagina
+                                                                # Expresión regular para buscar el número de página
+                                                                patron_pagina = r'(?:pages?|p\.)\s*(\d+)\s*-\s*(\d+)'
+
+                                                                # Buscar la coincidencia en el texto
+                                                                resultado_pagina = re.search(patron_pagina, texto_blockquote)
+
+                                                                # Verificar si se encontró una coincidencia y extraer el número de página
+                                                                if resultado_pagina:
+                                                                    numero_pagina_inicio = resultado_pagina.group(1)
+                                                                    numero_pagina_final = resultado_pagina.group(2)
+                                                                    paginas = numero_pagina_inicio + '-' + numero_pagina_final
+                                                                else:
+                                                                    paginas = ""
 
                                                                 # Obtener año de publicación
                                                                 indices_comas = [m.start() for m in re.finditer(r',', texto_blockquote)]
@@ -378,6 +404,8 @@ def procesar_grupo(fila):
                                                                     else:
                                                                         nombre_limpio = re.sub(r"['\\]", '', nombre.strip())
                                                                         if nombre_limpio:
+                                                                            #Solo deja la primera letra en mayuscula
+                                                                            nombre_limpio = nombre_limpio.title()
                                                                             nombres_integrantes_limpios.append(nombre_limpio)
                                                                         continue
                                                                     
@@ -400,7 +428,7 @@ def procesar_grupo(fila):
                                                                         articulo_existente[1] = articulo_existente[1].split(', ') + [nombre for nombre in nombres_integrantes_lista if nombre.strip() and nombre.strip() not in articulo_existente[1]]
                                                                 else:
                                                                     # Si el artículo no está en la lista, agregarlo
-                                                                    articulos.append((titulo_articulo, nombres_integrantes_str,  tipo_producto, tipo_articulo, estado, pais, titulo_revista, issn, editorial, volumen, fasciculo, año, doi, palabras, areas, sectores))
+                                                                    articulos.append((titulo_articulo, nombres_integrantes_str,  tipo_producto, tipo_articulo, estado, pais, titulo_revista, issn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores))
                                                                    
                                                 #Va al siguinete articulo                
                                                 fila_articulos = fila_articulos.find_next_sibling('tr')
@@ -427,7 +455,7 @@ try:
     response = session.get(url, verify=False)
 
     # Analizar el HTML
-    soup = BeautifulSoup(response.text, 'lxml')
+    soup = BeautifulSoup(response.text, 'html.parser', from_encoding='utf-8')
 
     # Encontrar y extraer la información deseada
     filas = soup.find_all('tr')[1:] # Omitir la primera fila que contiene la línea no deseada
@@ -436,7 +464,7 @@ try:
     with open(archivo_salida, 'w', newline='', encoding='utf-8') as csvfile:
         writer = csv.writer(csvfile)
         # El nombre de las columnas en el CSV
-        writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Nombre del líder', 'Enlace al CvLac líder', 'Nombre del integrante', 'Enlace al CvLac del investigador', 'Nombre en citaciones', 'Nacionalidad', 'Sexo', 'Categoría', 'Título publicación', 'Integrantes involucrados', 'Tipo producto', 'Tipo publicación', 'Estado', 'País','Titulo revista','ISSN', 'Editorial', 'Volumen', 'Fascículo', 'Año publicación', 'DOI', 'Palabras clave', 'Areas', 'Sectores'])
+        writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Nombre del líder', 'Enlace al CvLac líder', 'Nombre del integrante', 'Enlace al CvLac del investigador', 'Nombre en citaciones', 'Nacionalidad', 'Sexo', 'Categoría', 'Título publicación', 'Integrantes involucrados', 'Tipo producto', 'Tipo publicación', 'Estado', 'País','Titulo revista','ISSN', 'Editorial', 'Volumen', 'Fascículo', 'Páginas', 'Año publicación', 'DOI', 'Palabras clave', 'Areas', 'Sectores'])
 
         # Crear hilos para procesar los grupos
         with ThreadPoolExecutor() as executor:
@@ -447,10 +475,11 @@ try:
                 if datos:
                     grupo, enlace_grupo, lider, cvlac_lider, integrantes = datos
                     for integrante in integrantes:
-                        nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, articulos = integrante
-                        for articulo in articulos:
-                            titulo_articulo, nombres_integrantes, tipo_producto, tipo_articulo, estado, pais,titulo_revista, issn, editorial, volumen, fasciculo, año, doi, palabras, areas, sectores = articulo
-                            writer.writerow([grupo, enlace_grupo, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, titulo_articulo, nombres_integrantes, tipo_producto, tipo_articulo, estado, pais, titulo_revista, issn, editorial, volumen, fasciculo, año, doi, palabras, areas, sectores])
+                        if len(integrante) == 7:
+                            nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, articulos = integrante
+                            for articulo in articulos:
+                                titulo_articulo, nombres_integrantes, tipo_producto, tipo_articulo, estado, pais,titulo_revista, issn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores = articulo
+                                writer.writerow([grupo, enlace_grupo, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, titulo_articulo, nombres_integrantes, tipo_producto, tipo_articulo, estado, pais, titulo_revista, issn, editorial, volumen, fasciculo, paginas,año, doi, palabras, areas, sectores])
     
     print("Resultados almacenados en", archivo_salida)
 
