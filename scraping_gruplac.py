@@ -7,6 +7,7 @@ import csv
 import os
 from concurrent.futures import ThreadPoolExecutor
 import re
+import json
 
 # Desactivar las advertencias de solicitudes inseguras (solo para pruebas)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -34,7 +35,8 @@ os.environ['https_proxy'] = ''
 url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=152'
 
 # Los resultados se van a almacenar en un csv con nombre resultados_grupos
-archivo_salida = 'resultados_grupos.csv'
+archivo_salida_json = 'resultados_grupos_json.json'
+archivo_salida_csv = 'resultados_grupos_csv.csv'
 
 paises_espanol = [
     "Afganistán", "Albania", "Alemania", "Andorra", "Angola", "Antigua y Barbuda", "Arabia Saudita", "Argelia",
@@ -488,39 +490,84 @@ def procesar_grupo(fila):
 
     return []
 
-#Proceso de agregar la infromación al CSV
 try:
     # Realizar la solicitud HTTP
     response = session.get(url, verify=False)
-
     # Analizar el HTML
     soup = BeautifulSoup(response.text, 'html.parser', from_encoding='utf-8')
-
     # Encontrar y extraer la información deseada
     filas = soup.find_all('tr')[1:] # Omitir la primera fila que contiene la línea no deseada
 
-    # Abrir el archivo de salida en modo de escritura
-    with open(archivo_salida, 'w', newline='', encoding='utf-8') as csvfile:
+    # Abrir los archivos de salida en modo de escritura
+    with open(archivo_salida_csv, 'w', newline='', encoding='utf-8') as csvfile, \
+         open(archivo_salida_json, 'w', encoding='utf-8') as jsonfile:
+
         writer = csv.writer(csvfile)
+        data_json = []
+
         # El nombre de las columnas en el CSV
-        writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Nombre del líder', 'Enlace al CvLac líder', 'Nombre del integrante', 'Enlace al CvLac del investigador', 'Nombre en citaciones', 'Nacionalidad', 'Sexo', 'Categoría', 'Título publicación', 'Integrantes involucrados', 'Tipo producto', 'Tipo publicación', 'Estado', 'País','Titulo revista','ISSN', 'Editorial', 'Volumen', 'Fascículo', 'Páginas', 'Año publicación', 'DOI', 'Palabras clave', 'Areas', 'Sectores'])
+        writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Nombre del líder', 'Enlace al CvLac líder',
+                         'Nombre del integrante', 'Enlace al CvLac del investigador', 'Nombre en citaciones',
+                         'Nacionalidad', 'Sexo', 'Categoría', 'Título publicación', 'Integrantes involucrados',
+                         'Tipo producto', 'Tipo publicación', 'Estado', 'País', 'Titulo revista', 'ISSN',
+                         'Editorial', 'Volumen', 'Fascículo', 'Páginas', 'Año publicación', 'DOI', 'Palabras clave',
+                         'Areas', 'Sectores'])
 
         # Crear hilos para procesar los grupos
         with ThreadPoolExecutor() as executor:
             # Mapear la función procesar_grupo a cada fila de la tabla
             resultados = list(executor.map(procesar_grupo, filas))
 
-            for datos in resultados:
-                if datos:
-                    grupo, enlace_grupo, lider, cvlac_lider, integrantes = datos
-                    for integrante in integrantes:
-                        if len(integrante) == 7:
-                            nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria,publicaciones = integrante
-                            for publicacion in publicaciones:
-                                titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais,titulo_revista, issn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores = publicacion
-                                writer.writerow([grupo, enlace_grupo, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista, issn, editorial, volumen, fasciculo, paginas,año, doi, palabras, areas, sectores])
-    
-    print("Resultados almacenados en", archivo_salida)
+        for datos in resultados:
+            if datos:
+                grupo, enlace_grupo, lider, cvlac_lider, integrantes = datos
+                grupo_data = {
+                    'Nombre del grupo': grupo,
+                    'Enlace al GrupLac': enlace_grupo,
+                    'Nombre del líder': lider,
+                    'Enlace al CvLac líder': cvlac_lider,
+                    'Integrantes': []
+                }
+                for integrante in integrantes:
+                    if len(integrante) == 7:
+                        nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, publicaciones = integrante
+                        integrante_data = {
+                            'Nombre del integrante': nombre_integrante,
+                            'Enlace al CvLac del investigador': enlace_cvlac_integrante,
+                            'Nombre en citaciones': nombre_citaciones,
+                            'Nacionalidad': nacionalidad,
+                            'Sexo': sexo,
+                            'Categoría': categoria,
+                            'Publicaciones': []
+                        }
+                        for publicacion in publicaciones:
+                            titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista, issn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores = publicacion
+                            publicacion_data = {
+                                'Título publicación': titulo_publicacion,
+                                'Integrantes involucrados': nombres_integrantes,
+                                'Tipo producto': tipo_producto,
+                                'Tipo publicación': tipo_publicacion,
+                                'Estado': estado,
+                                'País': pais,
+                                'Titulo revista': titulo_revista,
+                                'ISSN': issn,
+                                'Editorial': editorial,
+                                'Volumen': volumen,
+                                'Fascículo': fasciculo,
+                                'Páginas': paginas,
+                                'Año publicación': año,
+                                'DOI': doi,
+                                'Palabras clave': palabras,
+                                'Areas': areas,
+                                'Sectores': sectores
+                            }
+                            integrante_data['Publicaciones'].append(publicacion_data)
+                            writer.writerow([grupo, enlace_grupo, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista, issn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores])
+                        grupo_data['Integrantes'].append(integrante_data)
+                data_json.append(grupo_data)
+
+        json.dump(data_json, jsonfile, ensure_ascii=False, indent=4)
+        print("Resultados almacenados en", archivo_salida_csv, "y", archivo_salida_json)
 
 except requests.exceptions.ConnectionError as e:
     print("Error de conexión:", e)
