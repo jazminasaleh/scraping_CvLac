@@ -37,38 +37,21 @@ url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionG
 # Los resultados se van a almacenar en un csv con nombre resultados_grupos
 archivo_salida_json = 'resultados_grupos_json.json'
 archivo_salida_csv = 'resultados_grupos_csv.csv'
+def cargar_paises_espanol():
+    paises = []
+    with open('paises_espanol.csv', 'r', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        for row in reader:
+            paises.append(row[0])
+    return paises
 
-paises_espanol = [
-    "Afganistán", "Albania", "Alemania", "Andorra", "Angola", "Antigua y Barbuda", "Arabia Saudita", "Argelia",
-    "Argentina", "Armenia", "Australia", "Austria", "Azerbaiyán", "Bahamas", "Bangladés", "Barbados", "Baréin",
-    "Bélgica", "Belice", "Benín", "Bielorrusia", "Birmania", "Bolivia", "Bosnia y Herzegovina", "Botsuana",
-    "Brasil", "Brunéi", "Bulgaria", "Burkina Faso", "Burundi", "Bután", "Cabo Verde", "Camboya", "Camerún",
-    "Canadá", "Catar", "Chad", "Chile", "China", "Chipre", "Ciudad del Vaticano", "Colombia", "Comoras", "Corea del Norte",
-    "Corea del Sur", "Costa de Marfil", "Costa Rica", "Croacia", "Cuba", "Dinamarca", "Dominica", "Ecuador", "Egipto",
-    "El Salvador", "Emiratos Árabes Unidos", "Eritrea", "Eslovaquia", "Eslovenia", "España", "Estados Unidos",
-    "Estonia", "Etiopía", "Filipinas", "Finlandia", "Fiyi", "Francia", "Gabón", "Gambia", "Georgia", "Ghana",
-    "Granada", "Grecia", "Guatemala", "Guyana", "Guinea", "Guinea ecuatorial", "Guinea-Bisáu", "Haití", "Honduras",
-    "Hungría", "India", "Indonesia", "Irak", "Irán", "Irlanda", "Islandia", "Islas Marshall", "Islas Salomón",
-    "Israel", "Italia", "Jamaica", "Japón", "Jordania", "Kazajistán", "Kenia", "Kirguistán", "Kiribati", "Kuwait",
-    "Laos", "Lesoto", "Letonia", "Líbano", "Liberia", "Libia", "Liechtenstein", "Lituania", "Luxemburgo", "Macedonia del Norte",
-    "Madagascar", "Malasia", "Malaui", "Maldivas", "Malí", "Malta", "Marruecos", "Mauricio", "Mauritania", "México",
-    "Micronesia", "Moldavia", "Mónaco", "Mongolia", "Montenegro", "Mozambique", "Namibia", "Nauru", "Nepal",
-    "Nicaragua", "Níger", "Nigeria", "Noruega", "Nueva Zelanda", "Omán", "Países Bajos", "Pakistán", "Palaos",
-    "Panamá", "Papúa Nueva Guinea", "Paraguay", "Perú", "Polonia", "Portugal", "Reino Unido", "República Centroafricana",
-    "República Checa", "República del Congo", "República Democrática del Congo", "República Dominicana",
-    "República Sudafricana", "Ruanda", "Rumania", "Rusia", "Samoa", "San Cristóbal y Nieves", "San Marino",
-    "San Vicente y las Granadinas", "Santa Lucía", "Santo Tomé y Príncipe", "Senegal", "Serbia", "Seychelles",
-    "Sierra Leona", "Singapur", "Siria", "Somalia", "Sri Lanka", "Suazilandia", "Sudán", "Sudán del Sur", "Suecia",
-    "Suiza", "Surinam", "Tailandia", "Tanzania", "Tayikistán", "Timor Oriental", "Togo", "Tonga", "Trinidad y Tobago",
-    "Túnez", "Turkmenistán", "Turquía", "Tuvalu", "Ucrania", "Uganda", "Uruguay", "Uzbekistán", "Vanuatu",
-    "Venezuela", "Vietnam", "Yemen", "Yibuti", "Zambia", "Zimbabue", "No Aplica"
-]
+paises_espanol = cargar_paises_espanol()
 
 # Función para extrear la informcaión de los grupos y sus investigadores
 def procesar_grupo(fila):
     columnas = fila.find_all('td')
 
-    # Verificar si hay al mas de tres columnas en la fila
+    # Verificar si hay mas de tres columnas en la fila
     if len(columnas) >= 3:
         tercer_td = columnas[2]
         #Se obtiene el enlcae del Gruplac
@@ -289,146 +272,34 @@ def procesar_grupo(fila):
                                                                 issn = ''
 
                                                                 #Obtener ISSN del articulo o textos en publicaciones no cinetificas
-                                                                indice_issn = texto_blockquote.find("ISSN:")
-                                                                indice_ed = texto_blockquote.find("ed", indice_issn)
-                                                                indice_p = texto_blockquote.find("p.", indice_issn)
-                                                                if indice_issn != -1:
-                                                                    if indice_ed != -1 and indice_p != -1:
-                                                                        if indice_ed < indice_p:
-                                                                            issn = texto_blockquote[indice_issn + len("ISSN:"):indice_ed].strip()
-                                                                        else:
-                                                                            issn = texto_blockquote[indice_issn + len("ISSN:"):indice_p].strip()
-                                                                    elif indice_ed != -1:
-                                                                        issn = texto_blockquote[indice_issn + len("ISSN:"):indice_ed].strip()
-                                                                    elif indice_p != -1:
-                                                                        issn = texto_blockquote[indice_issn + len("ISSN:"):indice_p].strip()
-                                                                    else:
-                                                                        issn = texto_blockquote[indice_issn + len("ISSN:"):].strip()   
+                                                                issn = obtener_issn(texto_blockquote)  
                                                                 
                                                                 #Obtener editorial
-                                                                indice_ed = texto_blockquote.find("ed:", indice_issn)
-                                                                indice_v = texto_blockquote.find("v.", indice_ed)
-                                                                if indice_ed != -1:
-                                                                    if indice_v != -1:
-                                                                        editorial = texto_blockquote[indice_ed + len("ed:"):indice_v].strip()
-                                                                    else:
-                                                                        editorial = texto_blockquote[indice_ed + len("ed:"):].strip()
-                                                                else:
-                                                                    editorial = ""  # Deja la editorial en blanco si no se encuentra "ed:"
+                                                                editorial = obtener_editorial(texto_blockquote)
                                                                 
                                                                 #Obtener Volumen 
-                                                                indice_v = texto_blockquote.find("v.", indice_issn)
-                                                                indice_fasc = texto_blockquote.find("fasc.", indice_v)
-                                                                indice_palabras_clave = texto_blockquote.find("Palabras:", indice_v)
-                                                                if indice_v != -1:
-                                                                    if indice_fasc != -1:
-                                                                        volumen = texto_blockquote[indice_v + len("v."):indice_fasc].strip()
-                                                                    elif indice_palabras_clave != -1:
-                                                                        volumen = texto_blockquote[indice_v + len("v."):indice_palabras_clave].strip()
-                                                                    else:
-                                                                        volumen = texto_blockquote[indice_v + len("v."):].strip()
-                                                                    if not volumen.isdigit():
-                                                                        volumen = ""
-                                                                else:
-                                                                    volumen = ""  # Deja el volumen en blanco si no se encuentra "v."
+                                                                volumen = obtener_volumen(texto_blockquote)
                                                                 
                                                                 #Obtener fasciculo 
-                                                                indice_fasc = texto_blockquote.find("fasc.", indice_v)
-                                                                indice_p = texto_blockquote.find("p.", indice_fasc)
-                                                                if indice_fasc != -1:
-                                                                    if indice_p != -1:
-                                                                        fasciculo = texto_blockquote[indice_fasc + len("fasc."):indice_p].strip()
-                                                                    else:
-                                                                        fasciculo = texto_blockquote[indice_fasc + len("fasc."):].strip()
-                                                                else:
-                                                                    fasciculo = ""  # Deja el fascículo en blanco si no se encuentra "fasc."
-                                                                if fasciculo.isdigit():
-                                                                    if len(fasciculo) == 4:
-                                                                        fasciculo = ""
-                                                                else:
-                                                                    fasciculo = ""
+                                                                fasciculo = obtener_fasciculo(texto_blockquote)
 
                                                                 # Obtener el número de pagina
-                                                                patron_pagina = r'(?:pages?|p\.)\s*(\d+)\s*-\s*(\d+)'
-                                                                resultado_pagina = re.search(patron_pagina, texto_blockquote)
-                                                                if resultado_pagina:
-                                                                    numero_pagina_inicio = resultado_pagina.group(1)
-                                                                    numero_pagina_final = resultado_pagina.group(2)
-                                                                    paginas = numero_pagina_inicio + '-' + numero_pagina_final
-                                                                else:
-                                                                    paginas = ""
+                                                                paginas = obtener_paginas(texto_blockquote)
 
                                                                 # Obtener año de publicación
-                                                                indices_comas = [m.start() for m in re.finditer(r',', texto_blockquote)]
-                                                                indices_puntos = [m.start() for m in re.finditer(r'. ', texto_blockquote)]
-                                                                año = ""
-
-                                                                for i in range(len(indices_comas) - 1):
-                                                                    posible_año = texto_blockquote[indices_comas[i] + 1:indices_comas[i + 1]].strip()
-                                                                    if posible_año.isdigit() and len(posible_año) == 4:
-                                                                        año = posible_año
-                                                                        break
-
-                                                                if not año:
-                                                                    for indice_punto in indices_puntos:
-                                                                        posible_año = texto_blockquote[indice_punto + 2:indice_punto + 6]
-                                                                        if posible_año.isdigit():
-                                                                            año = posible_año
-                                                                            break
+                                                                año = obtener_año(texto_blockquote)
                                                                 
                                                                 #Obtener el DOI
-                                                                indice_doi = texto_blockquote.find("DOI:")
-                                                                if indice_doi != -1:
-                                                                    indice_palabras = texto_blockquote.find("Palabras:", indice_doi)
-                                                                    indice_sectores = texto_blockquote.find("Sectores:", indice_doi)
-                                                                    indice_doi_dos = texto_blockquote.find("doi:", indice_doi)
-                                                                    if indice_palabras != -1:
-                                                                        doi = texto_blockquote[indice_doi + len("DOI:"):indice_palabras].strip()
-                                                                    elif indice_sectores != -1:
-                                                                        doi = texto_blockquote[indice_doi + len("DOI:"):indice_sectores].strip()
-                                                                    elif indice_doi_dos != -1:
-                                                                        doi = texto_blockquote[indice_doi_dos + len("doi:"):].strip()
-                                                                    else:
-                                                                        doi = texto_blockquote[indice_doi + len("DOI:"):].strip()
-                                                                else:
-                                                                    doi = ""
+                                                                doi = obtener_doi(texto_blockquote)
 
                                                                 #Obtener palabras claves de la publicacion
-                                                                indice_palabras = texto_blockquote.find("Palabras:")
-                                                                if indice_palabras != -1:
-                                                                    indice_sectores = texto_blockquote.find("Sectores:", indice_palabras)
-                                                                    if indice_sectores != -1:
-                                                                        palabras_texto = texto_blockquote[indice_palabras + len("Palabras:"):indice_sectores].strip()
-                                                                    else:
-                                                                        palabras_texto = texto_blockquote[indice_palabras + len("Palabras:"):].strip()
-                                                                    palabras_limpio = [palabra.strip() for palabra in palabras_texto.split(",") if palabra.strip()]
-                                                                    palabras = ', '.join(palabras_limpio)
-                                                                else:
-                                                                    palabras = "" # Deja las palabras en blanco si no se encuentra "Palabras:"
+                                                                palabras = obtener_palabras_clave(texto_blockquote)
                                                                 
                                                                 #Obtener areas
-                                                                indice_areas = texto_blockquote.find("Areas:")
-                                                                if indice_areas != -1:
-                                                                    indice_sectores = texto_blockquote.find("Sectores:", indice_areas)
-                                                                    if indice_sectores != -1:
-                                                                        areas_texto = texto_blockquote[indice_areas + len("Areas:"):indice_sectores].strip()
-                                                                    else:
-                                                                        areas_texto = texto_blockquote[indice_areas + len("Areas:"):].strip()
-                                                                    areas_limpio = [area.strip() for area in areas_texto.split(",") if area.strip()]
-                                                                    areas = ', '.join(areas_limpio)
-                                                                else:
-                                                                    areas = "" # Deja las áreas en blanco si no se encuentra "Areas:"
+                                                                areas = obtener_areas(texto_blockquote)
                                                                 
-
                                                                 # Obtener sectores del artículo
-                                                                indice_sectores = texto_blockquote.find("Sectores:")
-                                                                if indice_sectores != -1:
-                                                                    sectores_texto = texto_blockquote[indice_sectores + len("Sectores:"):].strip()
-                                                                     # Limpiar y dividir los sectores
-                                                                    sectores_limpio = [sector.strip() for sector in sectores_texto.split(",") if sector.strip()]
-                                                                    sectores = ', '.join(sectores_limpio)
-                                                                else:
-                                                                    sectores = "" # Deja los sectores en blanco si no se encuentra "Sectores:"
+                                                                sectores = obtener_sectores(texto_blockquote)
 
                                                                 nombres_integrantes = texto_blockquote[:indice_comilla1].split(',')
                                                                 nombres_integrantes_limpios = []
@@ -457,7 +328,6 @@ def procesar_grupo(fila):
                                                                 nombres_integrantes_str = ', '.join(nombres_integrantes_limpios)
                                                                 nombres_integrantes_lista = nombres_integrantes_str.split(',')
                                                                 
-                                                               
                                                                 publicacion_existente = next((a for a in publicaciones if a[0] == titulo_publicacion), None)
                                                                                                                               
                                                                 if publicacion_existente is not None:
@@ -489,6 +359,176 @@ def procesar_grupo(fila):
             return [nombre_grupo, enlace_gruplac_grupo, nombre_lider, cvlac_lider, integrantes]
 
     return []
+
+def obtener_pais_y_titulo_revista(texto_blockquote, tipo_producto):
+    indice_pais = texto_blockquote.find("En:")
+    pais = ""
+    titulo_revista = ""
+    if indice_pais != -1:
+        indice_palabra_despues_de_en = indice_pais + len("En:")
+        palabras = texto_blockquote[indice_palabra_despues_de_en:].split()[:3]
+        nombre_pais = " ".join(palabras).lower()
+        for pais_valido in paises_espanol:
+            if nombre_pais == pais_valido.lower() or nombre_pais.startswith(pais_valido.lower()):
+                pais = pais_valido
+                break
+        
+        if tipo_producto == "Artículos":
+            indice_issn = texto_blockquote.find("ISSN:")
+            if indice_issn != -1:
+                titulo_revista = texto_blockquote[indice_palabra_despues_de_en:indice_issn].replace(pais, "").strip()
+        elif tipo_producto == "Textos en publicaciones no científicas":
+            indice_issn = texto_blockquote.find("ISSN:")
+            if indice_issn != -1:
+                titulo_revista = texto_blockquote[indice_palabra_despues_de_en:indice_issn].replace(pais, "").strip()
+    
+    return pais, titulo_revista
+
+def obtener_issn(texto_blockquote):
+    indice_issn = texto_blockquote.find("ISSN:")
+    if indice_issn != -1:
+        indice_ed = texto_blockquote.find("ed", indice_issn)
+        indice_p = texto_blockquote.find("p.", indice_issn)
+        if indice_ed != -1 and indice_p != -1:
+            if indice_ed < indice_p:
+                return texto_blockquote[indice_issn + len("ISSN:"):indice_ed].strip()
+            else:
+                return texto_blockquote[indice_issn + len("ISSN:"):indice_p].strip()
+        elif indice_ed != -1:
+            return texto_blockquote[indice_issn + len("ISSN:"):indice_ed].strip()
+        elif indice_p != -1:
+            return texto_blockquote[indice_issn + len("ISSN:"):indice_p].strip()
+        else:
+            return texto_blockquote[indice_issn + len("ISSN:"):].strip()   
+    return ""
+
+def obtener_editorial(texto_blockquote):
+    indice_ed = texto_blockquote.find("ed:", texto_blockquote.find("ISSN:"))
+    if indice_ed != -1:
+        indice_v = texto_blockquote.find("v.", indice_ed)
+        if indice_v != -1:
+            return texto_blockquote[indice_ed + len("ed:"):indice_v].strip()
+        else:
+            return texto_blockquote[indice_ed + len("ed:"):].strip()
+    return ""
+
+def obtener_volumen(texto_blockquote):
+    indice_v = texto_blockquote.find("v.", texto_blockquote.find("ISSN:"))
+    if indice_v != -1:
+        indice_fasc = texto_blockquote.find("fasc.", indice_v)
+        indice_palabras_clave = texto_blockquote.find("Palabras:", indice_v)
+        if indice_fasc != -1:
+            volumen = texto_blockquote[indice_v + len("v."):indice_fasc].strip()
+        elif indice_palabras_clave != -1:
+            volumen = texto_blockquote[indice_v + len("v."):indice_palabras_clave].strip()
+        else:
+            volumen = texto_blockquote[indice_v + len("v."):].strip()
+        return volumen if volumen.isdigit() else ""
+    return ""
+
+def obtener_fasciculo(texto_blockquote):
+    indice_fasc = texto_blockquote.find("fasc.", texto_blockquote.find("v."))
+    if indice_fasc != -1:
+        indice_p = texto_blockquote.find("p.", indice_fasc)
+        if indice_p != -1:
+            fasciculo = texto_blockquote[indice_fasc + len("fasc."):indice_p].strip()
+        else:
+            fasciculo = texto_blockquote[indice_fasc + len("fasc."):].strip()
+        return "" if fasciculo.isdigit() and len(fasciculo) == 4 else fasciculo
+    return ""
+
+def obtener_paginas(texto_blockquote):
+    patron_pagina = r'(?:pages?|p\.)\s*(\d+)\s*-\s*(\d+)'
+    resultado_pagina = re.search(patron_pagina, texto_blockquote)
+    if resultado_pagina:
+        return f"{resultado_pagina.group(1)}-{resultado_pagina.group(2)}"
+    return ""
+
+def obtener_año(texto_blockquote):
+    indices_comas = [m.start() for m in re.finditer(r',', texto_blockquote)]
+    indices_puntos = [m.start() for m in re.finditer(r'. ', texto_blockquote)]
+    
+    for i in range(len(indices_comas) - 1):
+        posible_año = texto_blockquote[indices_comas[i] + 1:indices_comas[i + 1]].strip()
+        if posible_año.isdigit() and len(posible_año) == 4:
+            return posible_año
+    
+    for indice_punto in indices_puntos:
+        posible_año = texto_blockquote[indice_punto + 2:indice_punto + 6]
+        if posible_año.isdigit():
+            return posible_año
+    
+    return ""
+
+def obtener_doi(texto_blockquote):
+    indice_doi = texto_blockquote.find("DOI:")
+    if indice_doi != -1:
+        indice_palabras = texto_blockquote.find("Palabras:", indice_doi)
+        indice_sectores = texto_blockquote.find("Sectores:", indice_doi)
+        indice_doi_dos = texto_blockquote.find("doi:", indice_doi)
+        if indice_palabras != -1:
+            return texto_blockquote[indice_doi + len("DOI:"):indice_palabras].strip()
+        elif indice_sectores != -1:
+            return texto_blockquote[indice_doi + len("DOI:"):indice_sectores].strip()
+        elif indice_doi_dos != -1:
+            return texto_blockquote[indice_doi_dos + len("doi:"):].strip()
+        else:
+            return texto_blockquote[indice_doi + len("DOI:"):].strip()
+    return ""
+
+def obtener_palabras_clave(texto_blockquote):
+    indice_palabras = texto_blockquote.find("Palabras:")
+    if indice_palabras != -1:
+        indice_sectores = texto_blockquote.find("Sectores:", indice_palabras)
+        if indice_sectores != -1:
+            palabras_texto = texto_blockquote[indice_palabras + len("Palabras:"):indice_sectores].strip()
+        else:
+            palabras_texto = texto_blockquote[indice_palabras + len("Palabras:"):].strip()
+        palabras_limpio = [palabra.strip() for palabra in palabras_texto.split(",") if palabra.strip()]
+        return ', '.join(palabras_limpio)
+    return ""
+
+def obtener_areas(texto_blockquote):
+    indice_areas = texto_blockquote.find("Areas:")
+    if indice_areas != -1:
+        indice_sectores = texto_blockquote.find("Sectores:", indice_areas)
+        if indice_sectores != -1:
+            areas_texto = texto_blockquote[indice_areas + len("Areas:"):indice_sectores].strip()
+        else:
+            areas_texto = texto_blockquote[indice_areas + len("Areas:"):].strip()
+        areas_limpio = [area.strip() for area in areas_texto.split(",") if area.strip()]
+        return ', '.join(areas_limpio)
+    return ""
+
+def obtener_sectores(texto_blockquote):
+    indice_sectores = texto_blockquote.find("Sectores:")
+    if indice_sectores != -1:
+        sectores_texto = texto_blockquote[indice_sectores + len("Sectores:"):].strip()
+        sectores_limpio = [sector.strip() for sector in sectores_texto.split(",") if sector.strip()]
+        return ', '.join(sectores_limpio)
+    return ""
+
+def obtener_integrantes(texto_blockquote, indice_comilla1):
+    nombres_integrantes = texto_blockquote[:indice_comilla1].split(',')
+    nombres_integrantes_limpios = []
+    for nombre in nombres_integrantes:
+        indice_tipo_capitulo = nombre.find("Tipo: Capítulo de libro")
+        indice_tipo_otro_capitulo = nombre.find("Tipo: Otro capítulo de libro publicado")
+        
+        if indice_tipo_capitulo != -1:
+            indice_tipo = indice_tipo_capitulo
+        elif indice_tipo_otro_capitulo != -1:
+            indice_tipo = indice_tipo_otro_capitulo
+        else:
+            nombre_limpio = re.sub(r"['\\]", '', nombre.strip())
+            if nombre_limpio:
+                nombres_integrantes_limpios.append(nombre_limpio.title())
+            continue
+        
+        nombre_limpio = re.sub(r"['\\]", '', nombre[:indice_tipo].strip())
+        nombres_integrantes_limpios.append(nombre_limpio.title())
+    
+    return ', '.join(nombres_integrantes_limpios)
 
 try:
     # Realizar la solicitud HTTP
