@@ -8,6 +8,8 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 import re
 import json
+from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure
 
 # Desactivar las advertencias de solicitudes inseguras (solo para pruebas)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -32,7 +34,7 @@ os.environ['http_proxy'] = ''
 os.environ['https_proxy'] = ''
 
 # URL del GrupLac, se toman los 152 grupos
-url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=152'
+url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=1'
 
 # Los resultados se van a almacenar en un csv con nombre resultados_grupos
 archivo_salida_json = 'resultados_grupos_json.json'
@@ -145,7 +147,7 @@ def procesar_grupo(fila):
                                                 celdas_publicacion = fila_publicacion.find_all('td')
                                                
                                                 
-                                                #Dentro de blockquote es donde se encuentra toda la informacion de las publicaciones de nuevo conocimiento
+                                                #Dentro de blockquote es donde se encuentra toda la informacion de las publicaciones 
                                                 if celdas_publicacion:
                                                     elementos_blockquote = celdas_publicacion[0].find('blockquote')
                                                     elementos_li = celdas_publicacion[0].find_all('li')
@@ -161,7 +163,7 @@ def procesar_grupo(fila):
                                                                 tipo_publicacion = "Capítulo de Libro"
                                                             img_tag = elemento.find('img')
                                                             estado = 'Vigente' if img_tag else 'No Vigente'
-                                                    #Obtener los datos de la publicación de nuevo conocimiento
+                                                    #Obtener los datos de la publicación
                                                     titulo_revista = ""
                                                     if elementos_blockquote:
                                                         texto_blockquote = elementos_blockquote.get_text(strip=True)
@@ -271,61 +273,17 @@ def procesar_grupo(fila):
                                                                     
                                                                 issn = ''
 
-                                                                #Obtener ISSN del articulo o textos en publicaciones no cinetificas
                                                                 issn = obtener_issn(texto_blockquote)  
-                                                                
-                                                                #Obtener editorial
                                                                 editorial = obtener_editorial(texto_blockquote)
-                                                                
-                                                                #Obtener Volumen 
                                                                 volumen = obtener_volumen(texto_blockquote)
-                                                                
-                                                                #Obtener fasciculo 
                                                                 fasciculo = obtener_fasciculo(texto_blockquote)
-
-                                                                # Obtener el número de pagina
                                                                 paginas = obtener_paginas(texto_blockquote)
-
-                                                                # Obtener año de publicación
                                                                 año = obtener_año(texto_blockquote)
-                                                                
-                                                                #Obtener el DOI
                                                                 doi = obtener_doi(texto_blockquote)
-
-                                                                #Obtener palabras claves de la publicacion
                                                                 palabras = obtener_palabras_clave(texto_blockquote)
-                                                                
-                                                                #Obtener areas
                                                                 areas = obtener_areas(texto_blockquote)
-                                                                
-                                                                # Obtener sectores del artículo
                                                                 sectores = obtener_sectores(texto_blockquote)
-
-                                                                nombres_integrantes = texto_blockquote[:indice_comilla1].split(',')
-                                                                nombres_integrantes_limpios = []
-
-                                                                # Obtener integrantes 
-                                                                for nombre in nombres_integrantes:
-                                                                    indice_tipo_capitulo = nombre.find("Tipo: Capítulo de libro")
-                                                                    indice_tipo_otro_capitulo = nombre.find("Tipo: Otro capítulo de libro publicado")
-                                                                    
-                                                                    if indice_tipo_capitulo != -1:
-                                                                        indice_tipo = indice_tipo_capitulo
-                                                                    elif indice_tipo_otro_capitulo != -1:
-                                                                        indice_tipo = indice_tipo_otro_capitulo
-                                                                    else:
-                                                                        nombre_limpio = re.sub(r"['\\]", '', nombre.strip())
-                                                                        if nombre_limpio:
-                                                                            #Solo deja la primera letra en mayuscula
-                                                                            nombre_limpio = nombre_limpio.title()
-                                                                            nombres_integrantes_limpios.append(nombre_limpio)
-                                                                        continue
-                                                                    
-                                                                    nombre_limpio = re.sub(r"['\\]", '', nombre[:indice_tipo].strip())
-                                                                    nombres_integrantes_limpios.append(nombre_limpio)
-                                                                    
-
-                                                                nombres_integrantes_str = ', '.join(nombres_integrantes_limpios)
+                                                                nombres_integrantes_str = obtener_integrantes(texto_blockquote,  indice_comilla1)
                                                                 nombres_integrantes_lista = nombres_integrantes_str.split(',')
                                                                 
                                                                 publicacion_existente = next((a for a in publicaciones if a[0] == titulo_publicacion), None)
@@ -360,30 +318,7 @@ def procesar_grupo(fila):
 
     return []
 
-def obtener_pais_y_titulo_revista(texto_blockquote, tipo_producto):
-    indice_pais = texto_blockquote.find("En:")
-    pais = ""
-    titulo_revista = ""
-    if indice_pais != -1:
-        indice_palabra_despues_de_en = indice_pais + len("En:")
-        palabras = texto_blockquote[indice_palabra_despues_de_en:].split()[:3]
-        nombre_pais = " ".join(palabras).lower()
-        for pais_valido in paises_espanol:
-            if nombre_pais == pais_valido.lower() or nombre_pais.startswith(pais_valido.lower()):
-                pais = pais_valido
-                break
-        
-        if tipo_producto == "Artículos":
-            indice_issn = texto_blockquote.find("ISSN:")
-            if indice_issn != -1:
-                titulo_revista = texto_blockquote[indice_palabra_despues_de_en:indice_issn].replace(pais, "").strip()
-        elif tipo_producto == "Textos en publicaciones no científicas":
-            indice_issn = texto_blockquote.find("ISSN:")
-            if indice_issn != -1:
-                titulo_revista = texto_blockquote[indice_palabra_despues_de_en:indice_issn].replace(pais, "").strip()
-    
-    return pais, titulo_revista
-
+#Obtener ISSN del articulo o textos en publicaciones no cinetificas
 def obtener_issn(texto_blockquote):
     indice_issn = texto_blockquote.find("ISSN:")
     if indice_issn != -1:
@@ -437,6 +372,7 @@ def obtener_fasciculo(texto_blockquote):
         return "" if fasciculo.isdigit() and len(fasciculo) == 4 else fasciculo
     return ""
 
+# Obtener el número de pagina
 def obtener_paginas(texto_blockquote):
     patron_pagina = r'(?:pages?|p\.)\s*(\d+)\s*-\s*(\d+)'
     resultado_pagina = re.search(patron_pagina, texto_blockquote)
@@ -444,6 +380,7 @@ def obtener_paginas(texto_blockquote):
         return f"{resultado_pagina.group(1)}-{resultado_pagina.group(2)}"
     return ""
 
+ # Obtener año de publicación
 def obtener_año(texto_blockquote):
     indices_comas = [m.start() for m in re.finditer(r',', texto_blockquote)]
     indices_puntos = [m.start() for m in re.finditer(r'. ', texto_blockquote)]
@@ -476,6 +413,7 @@ def obtener_doi(texto_blockquote):
             return texto_blockquote[indice_doi + len("DOI:"):].strip()
     return ""
 
+#Obtener palabras claves de la publicacion
 def obtener_palabras_clave(texto_blockquote):
     indice_palabras = texto_blockquote.find("Palabras:")
     if indice_palabras != -1:
