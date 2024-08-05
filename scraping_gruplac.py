@@ -34,11 +34,25 @@ os.environ['http_proxy'] = ''
 os.environ['https_proxy'] = ''
 
 # URL del GrupLac, se toman los 152 grupos
-url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=1'
+url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=152'
 
 # Los resultados se van a almacenar en un csv con nombre resultados_grupos
 archivo_salida_json = 'resultados_grupos_json.json'
 archivo_salida_csv = 'resultados_grupos_csv.csv'
+
+#Conexion con mongodb
+'''
+MONGO_URI = "mongodb+srv://jazminasaleh:IRdNyaCqKVvHyhZ3@gruposinvestigacion.gpd7xka.mongodb.net/"
+
+try:
+    client = MongoClient(MONGO_URI)
+    db = client.grupos_investigacion  # Nombre de la base de datos
+    collection = db.grupos  # Nombre de la colección
+    print("Conexión a MongoDB Atlas establecida con éxito")
+except ConnectionFailure:
+    print("No se pudo conectar a MongoDB Atlas")
+'''
+
 def cargar_paises_espanol():
     paises = []
     with open('paises_espanol.csv', 'r', encoding='utf-8') as f:
@@ -476,10 +490,8 @@ try:
     # Encontrar y extraer la información deseada
     filas = soup.find_all('tr')[1:] # Omitir la primera fila que contiene la línea no deseada
 
-    # Abrir los archivos de salida en modo de escritura
-    with open(archivo_salida_csv, 'w', newline='', encoding='utf-8') as csvfile, \
-         open(archivo_salida_json, 'w', encoding='utf-8') as jsonfile:
-
+    # Abrir el archivo de salida CSV en modo de escritura
+    with open(archivo_salida_csv, 'w', newline='', encoding='utf-8') as csvfile:
         writer = csv.writer(csvfile)
         data_json = []
 
@@ -544,8 +556,21 @@ try:
                         grupo_data['Integrantes'].append(integrante_data)
                 data_json.append(grupo_data)
 
-        json.dump(data_json, jsonfile, ensure_ascii=False, indent=4)
-        print("Resultados almacenados en", archivo_salida_csv, "y", archivo_salida_json)
+        # Insertar datos en MongoDB Atlas
+        '''
+        try:
+            result = collection.insert_many(data_json)
+            print(f"Se insertaron {len(result.inserted_ids)} documentos en MongoDB Atlas")
+        except Exception as e:
+            print(f"Error al insertar documentos en MongoDB Atlas: {e}")
+
+        print("Resultados almacenados en", archivo_salida_csv, "y en MongoDB Atlas")
+        '''
 
 except requests.exceptions.ConnectionError as e:
     print("Error de conexión:", e)
+
+'''
+finally:
+    client.close()
+'''
