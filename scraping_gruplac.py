@@ -80,11 +80,9 @@ def procesar_grupo(fila):
             href_enlace = enlace_grupo.get('href')
             numero_url = href_enlace.split('=')[-1]
             enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro={numero_url}'
-
             # Obtener el nombre del líder y el enlace a su CvLac
             nombre_lider = columnas[3].text.strip()
-            #Solo deja la primera letra en mayuscula
-            nombre_lider = nombre_lider.title()
+
             cvlac_lider = ''
             enlace_lider = columnas[3].find('a')
             if enlace_lider:
@@ -92,6 +90,7 @@ def procesar_grupo(fila):
                 numero_url_lider = href_enlace_lider.split('=')[-1]
                 cvlac_lider = f'https://scienti.minciencias.gov.co/cvlac/visualizador/generarCurriculoCv.do?cod_rh={numero_url_lider}'
 
+            
             # Lista para almacenar los datos de los integrantes
             integrantes = []
 
@@ -101,10 +100,30 @@ def procesar_grupo(fila):
                 soup_grupo = BeautifulSoup(response_grupo.text, 'html.parser', from_encoding='utf-8')
 
                 tables = soup_grupo.find_all('table')
-
+                ano_mes_fromacion_grupo  = ""
+                ciudad_grupo = ""
+                clasificacion_grupo = ""
+                areas_grupo = ""
                 for table in tables:
                     primer_tr = table.find('tr')
                     primer_td = primer_tr.find('td')
+                    if primer_td and primer_td.text.strip() == "Datos básicos":
+                        filas = table.find_all('tr')
+                        for fila in filas:
+                            celdas = fila.find_all('td')
+                            if len(celdas) == 2:
+                                etiqueta = celdas[0].text.strip()
+                                valor = celdas[1].text.strip()
+                                    
+                                if etiqueta == "Año y mes de formación":
+                                    ano_mes_fromacion_grupo = valor
+                                elif etiqueta == "Departamento - Ciudad":
+                                    ciudad_grupo = valor
+                                elif etiqueta == "Clasificación":
+                                    clasificacion_grupo = ' '.join(valor.split())
+                                elif etiqueta == "Área de conocimiento":
+                                    areas_grupo = valor
+
                     if primer_td and primer_td.text.strip() == "Integrantes del grupo":
                         filas_tabla = table.find_all('tr')[2:]
                         
@@ -328,7 +347,7 @@ def procesar_grupo(fila):
                 integrantes = []
 
             # Devolver los datos del grupo y sus integrantes
-            return [nombre_grupo, enlace_gruplac_grupo, nombre_lider, cvlac_lider, integrantes]
+            return [nombre_grupo, enlace_gruplac_grupo, ano_mes_fromacion_grupo, ciudad_grupo, clasificacion_grupo, areas_grupo, nombre_lider, cvlac_lider, integrantes]
 
     return []
 
@@ -496,7 +515,7 @@ try:
         data_json = []
 
         # El nombre de las columnas en el CSV
-        writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Nombre del líder', 'Enlace al CvLac líder',
+        writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Fecha de formcación', 'Departamento - ciudad', 'Clasificación', 'Área de conocimiento', 'Nombre del líder', 'Enlace al CvLac líder',
                          'Nombre del integrante', 'Enlace al CvLac del investigador', 'Nombre en citaciones',
                          'Nacionalidad', 'Sexo', 'Categoría', 'Título publicación', 'Integrantes involucrados',
                          'Tipo producto', 'Tipo publicación', 'Estado', 'País', 'Titulo revista', 'ISSN',
@@ -510,10 +529,14 @@ try:
 
         for datos in resultados:
             if datos:
-                grupo, enlace_grupo, lider, cvlac_lider, integrantes = datos
+                grupo, enlace_grupo,  ano, ciudad, clasificacion, areas_grupo, lider, cvlac_lider, integrantes = datos
                 grupo_data = {
                     'Nombre del grupo': grupo,
                     'Enlace al GrupLac': enlace_grupo,
+                    'Fecha de formcación': ano, 
+                    'Departamento - ciudad': ciudad,
+                    'Clasificación': clasificacion,
+                    'Área de conocimiento': areas_grupo,
                     'Nombre del líder': lider,
                     'Enlace al CvLac líder': cvlac_lider,
                     'Integrantes': []
@@ -552,7 +575,7 @@ try:
                                 'Sectores': sectores
                             }
                             integrante_data['Publicaciones'].append(publicacion_data)
-                            writer.writerow([grupo, enlace_grupo, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista, issn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores])
+                            writer.writerow([grupo, enlace_grupo, ano, ciudad, clasificacion, areas_grupo, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista, issn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores])
                         grupo_data['Integrantes'].append(integrante_data)
                 data_json.append(grupo_data)
 
@@ -564,7 +587,7 @@ try:
         except Exception as e:
             print(f"Error al insertar documentos en MongoDB Atlas: {e}")
 
-        print("Resultados almacenados en", archivo_salida_csv, "y en MongoDB Atlas")
+        print("Resultados almacenados en", archivo_salida_csv, "y en MongoDB Atlas")/*9+8
         '''
 
 except requests.exceptions.ConnectionError as e:
