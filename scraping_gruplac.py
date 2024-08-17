@@ -34,7 +34,7 @@ os.environ['http_proxy'] = ''
 os.environ['https_proxy'] = ''
 
 # URL del GrupLac, se toman los 152 grupos
-url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=152'
+url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=31'
 
 # Los resultados se van a almacenar en un csv con nombre resultados_grupos
 archivo_salida_json = 'resultados_grupos_json.json'
@@ -119,8 +119,10 @@ def procesar_grupo(fila):
                                     ano_mes_fromacion_grupo = valor
                                 elif etiqueta == "Departamento - Ciudad":
                                     ciudad_grupo = valor
+                                    if "-" in ciudad_grupo:
+                                        ciudad_grupo = ciudad_grupo.split("-")[1].strip()
                                 elif etiqueta == "Clasificación":
-                                    clasificacion_grupo = ' '.join(valor.split())
+                                    clasificacion_grupo = valor[0]
                                 elif etiqueta == "Área de conocimiento":
                                     areas_grupo = valor
 
@@ -166,7 +168,9 @@ def procesar_grupo(fila):
                                         if categoria_td:
                                             categoria = categoria_td.find_next('td').text.strip()
                                             categoria = ' '.join(categoria.split()) #quitar los espacios adicionales
-                                        
+                                            ultimo_paren = categoria.rfind(')')
+                                            if ultimo_paren != -1:
+                                                categoria = categoria[:ultimo_paren + 1].strip()
                                         # Buscar la sección de 'Artículos','Libros','Capitulos de libro', 'Textos en publicaciones no científicas'
                                         seccion_publicacion = table_cvlac.find('h3', string=['Artículos','Libros','Capitulos de libro', 'Textos en publicaciones no científicas'])
                                         if seccion_publicacion:
@@ -191,9 +195,13 @@ def procesar_grupo(fila):
                                                             texto_publicacion=elemento.find('b')
                                                             tipo_publicacion = ''
                                                             if texto_publicacion:
-                                                                tipo_publicacion = texto_publicacion.get_text().split(' - ')[-1]
+                                                                texto= texto_publicacion.get_text()
+                                                                if texto in ["Palabras: ","Areas: ","Sectores: "]:
+                                                                     tipo_publicacion="Capítulo de Libro"
+                                                                else: 
+                                                                 tipo_publicacion=texto.split(' - ')[-1]
                                                             else:
-                                                                tipo_publicacion = "Capítulo de Libro"
+                                                                tipo_publicacion="Capítulo de Libro"
                                                             img_tag = elemento.find('img')
                                                             estado = 'Vigente' if img_tag else 'No Vigente'
                                                     #Obtener los datos de la publicación
@@ -209,6 +217,7 @@ def procesar_grupo(fila):
                                                             if indice_comilla2 != -1:
                                                                 titulo_publicacion = texto_blockquote[indice_comilla1 + 1:indice_comilla2]
                                                                 tipo_publicacion = tipo_publicacion.title()
+                                                                
                                                                 indice_pais = texto_blockquote.find("En:")
                                                                 if indice_pais != -1:
                                                                     indice_palabra_despues_de_en = indice_pais + len("En:")
@@ -305,8 +314,10 @@ def procesar_grupo(fila):
                                                                         titulo_revista = ""
                                                                     
                                                                 issn = ''
-
+                                                                isbn = ''
                                                                 issn = obtener_issn(texto_blockquote)  
+                                                                isbn = obtener_isbn(texto_blockquote)
+                                                                nombre_libro=obtener_nombre_libro(texto_blockquote)
                                                                 editorial = obtener_editorial(texto_blockquote)
                                                                 volumen = obtener_volumen(texto_blockquote)
                                                                 fasciculo = obtener_fasciculo(texto_blockquote)
@@ -330,7 +341,7 @@ def procesar_grupo(fila):
                                                                         publicacion_existente[1] = publicacion_existente[1].split(', ') + [nombre for nombre in nombres_integrantes_lista if nombre.strip() and nombre.strip() not in publicacion_existente[1]]
                                                                 else:
                                                                     # Si el artículo no está en la lista, agregarlo
-                                                                   publicaciones.append((titulo_publicacion, nombres_integrantes_str,  tipo_producto, tipo_publicacion, estado, pais, titulo_revista, issn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores))
+                                                                   publicaciones.append((titulo_publicacion, nombres_integrantes_str,  tipo_producto, tipo_publicacion, estado, pais, titulo_revista,nombre_libro, issn,isbn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores))
                                                                    
                                                 #Va a la siguinete publicacion               
                                                 fila_publicacion = fila_publicacion.find_next_sibling('tr')
@@ -370,29 +381,77 @@ def obtener_issn(texto_blockquote):
             return texto_blockquote[indice_issn + len("ISSN:"):].strip()   
     return ""
 
+def obtener_isbn(texto_blockquote):
+    indice_isbn = texto_blockquote.find("ISBN:")
+    if indice_isbn != -1:
+        indice_v = texto_blockquote.find("v.", indice_isbn)
+        indice_ed = texto_blockquote.find("ed:", indice_isbn)
+        indice_p = texto_blockquote.find("p.", indice_isbn)
+        
+        topes = [i for i in [indice_v, indice_ed, indice_p] if i != -1]
+        if topes:
+            primer_tope = min(topes)
+            return texto_blockquote[indice_isbn + len("ISBN:"):primer_tope].strip().strip(',')
+        else:
+            return texto_blockquote[indice_isbn + len("ISBN:"):].strip().strip(',')
+    
+    return ""
+
+def obtener_nombre_libro(texto_blockquote):
+    indice_inicio = texto_blockquote.find('"')
+    indice_fin = texto_blockquote.find("En:", indice_inicio)
+    
+    if indice_inicio != -1and indice_fin != -1:
+        nombre_libro = texto_blockquote[indice_inicio + 1:indice_fin].strip()
+        return nombre_libro
+    
+    return""
+
 def obtener_editorial(texto_blockquote):
-    indice_ed = texto_blockquote.find("ed:", texto_blockquote.find("ISSN:"))
+    indice_ed = texto_blockquote.find("ed:")
+    
     if indice_ed != -1:
         indice_v = texto_blockquote.find("v.", indice_ed)
-        if indice_v != -1:
-            return texto_blockquote[indice_ed + len("ed:"):indice_v].strip()
+        indice_isbn_despues = texto_blockquote.find("ISBN:", indice_ed)
+        
+        if indice_v != -1 and (indice_isbn_despues == -1 or indice_v < indice_isbn_despues):
+            editorial = texto_blockquote[indice_ed + len("ed:"):indice_v].strip()
+        elif indice_isbn_despues != -1:
+            editorial = texto_blockquote[indice_ed + len("ed:"):indice_isbn_despues].strip()
         else:
-            return texto_blockquote[indice_ed + len("ed:"):].strip()
+            editorial = texto_blockquote[indice_ed + len("ed:"):].strip()
+        
+        if editorial.endswith(','):
+            editorial = editorial[:-1].strip()
+        
+        return editorial
+    
     return ""
 
 def obtener_volumen(texto_blockquote):
-    indice_v = texto_blockquote.find("v.", texto_blockquote.find("ISSN:"))
+    indice_v = texto_blockquote.find("v.")
+    
+    if indice_v == -1:
+        indice_isbn = texto_blockquote.find("ISBN")
+        if indice_isbn != -1:
+            indice_v = texto_blockquote.find("v. ", indice_isbn)
+    
     if indice_v != -1:
         indice_fasc = texto_blockquote.find("fasc.", indice_v)
         indice_palabras_clave = texto_blockquote.find("Palabras:", indice_v)
-        if indice_fasc != -1:
-            volumen = texto_blockquote[indice_v + len("v."):indice_fasc].strip()
-        elif indice_palabras_clave != -1:
-            volumen = texto_blockquote[indice_v + len("v."):indice_palabras_clave].strip()
+        topes = [i for i in [indice_fasc, indice_palabras_clave] if i != -1]
+        
+        if topes:
+            primer_tope = min(topes)
+            volumen = texto_blockquote[indice_v + len("v."):primer_tope].strip().strip(',')
         else:
-            volumen = texto_blockquote[indice_v + len("v."):].strip()
+            volumen = texto_blockquote[indice_v + len("v."):].strip().strip(',')
+        
         return volumen if volumen.isdigit() else ""
+    
     return ""
+
+
 
 def obtener_fasciculo(texto_blockquote):
     indice_fasc = texto_blockquote.find("fasc.", texto_blockquote.find("v."))
@@ -518,7 +577,7 @@ try:
         writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Fecha de formcación', 'Departamento - ciudad', 'Clasificación', 'Área de conocimiento', 'Nombre del líder', 'Enlace al CvLac líder',
                          'Nombre del integrante', 'Enlace al CvLac del investigador', 'Nombre en citaciones',
                          'Nacionalidad', 'Sexo', 'Categoría', 'Título publicación', 'Integrantes involucrados',
-                         'Tipo producto', 'Tipo publicación', 'Estado', 'País', 'Titulo revista', 'ISSN',
+                         'Tipo producto', 'Tipo publicación', 'Estado', 'País', 'Titulo revista', 'Nombre Libro','ISSN','ISBN',
                          'Editorial', 'Volumen', 'Fascículo', 'Páginas', 'Año publicación', 'DOI', 'Palabras clave',
                          'Areas', 'Sectores'])
 
@@ -554,7 +613,7 @@ try:
                             'Publicaciones': []
                         }
                         for publicacion in publicaciones:
-                            titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista, issn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores = publicacion
+                            titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista, nombre_libro,issn,isbn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores = publicacion
                             publicacion_data = {
                                 'Título publicación': titulo_publicacion,
                                 'Integrantes involucrados': nombres_integrantes,
@@ -563,7 +622,9 @@ try:
                                 'Estado': estado,
                                 'País': pais,
                                 'Titulo revista': titulo_revista,
+                                'Nombre Libro':nombre_libro,
                                 'ISSN': issn,
+                                'ISBN':isbn,
                                 'Editorial': editorial,
                                 'Volumen': volumen,
                                 'Fascículo': fasciculo,
@@ -575,7 +636,7 @@ try:
                                 'Sectores': sectores
                             }
                             integrante_data['Publicaciones'].append(publicacion_data)
-                            writer.writerow([grupo, enlace_grupo, ano, ciudad, clasificacion, areas_grupo, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista, issn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores])
+                            writer.writerow([grupo, enlace_grupo, ano, ciudad, clasificacion, areas_grupo, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista,nombre_libro,issn, isbn,editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores])
                         grupo_data['Integrantes'].append(integrante_data)
                 data_json.append(grupo_data)
 
