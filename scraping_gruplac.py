@@ -34,24 +34,25 @@ os.environ['http_proxy'] = ''
 os.environ['https_proxy'] = ''
 
 # URL del GrupLac, se toman los 152 grupos
-url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=31'
+url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=152'
 
 # Los resultados se van a almacenar en un csv con nombre resultados_grupos
 archivo_salida_json = 'resultados_grupos_json.json'
 archivo_salida_csv = 'resultados_grupos_csv.csv'
 
 #Conexion con mongodb
-'''
-MONGO_URI = "mongodb+srv://jazminasaleh:IRdNyaCqKVvHyhZ3@gruposinvestigacion.gpd7xka.mongodb.net/"
+"""
+MONGO_URI = "mongodb+srv://juanitasanabria:XwFAqnuDWYryhzab@cvlacdb.tbchf.mongodb.net/"
+
 
 try:
     client = MongoClient(MONGO_URI)
-    db = client.grupos_investigacion  # Nombre de la base de datos
+    db = client.cvlacdb  # Nombre de la base de datos
     collection = db.grupos  # Nombre de la colección
     print("Conexión a MongoDB Atlas establecida con éxito")
 except ConnectionFailure:
     print("No se pudo conectar a MongoDB Atlas")
-'''
+"""
 
 def cargar_paises_espanol():
     paises = []
@@ -65,6 +66,10 @@ paises_espanol = cargar_paises_espanol()
 
 # Función para extrear la informcaión de los grupos y sus investigadores
 def procesar_grupo(fila):
+    ano_mes_fromacion_grupo  = ""
+    ciudad_grupo = ""
+    clasificacion_grupo = ""
+    areas_grupo = ""
     columnas = fila.find_all('td')
 
     # Verificar si hay mas de tres columnas en la fila
@@ -116,15 +121,27 @@ def procesar_grupo(fila):
                                 valor = celdas[1].text.strip()
                                     
                                 if etiqueta == "Año y mes de formación":
-                                    ano_mes_fromacion_grupo = valor
+                                    if valor:
+                                        ano_mes_fromacion_grupo = valor
+                                    else:
+                                        ano_mes_fromacion_grupo = ""
                                 elif etiqueta == "Departamento - Ciudad":
-                                    ciudad_grupo = valor
-                                    if "-" in ciudad_grupo:
-                                        ciudad_grupo = ciudad_grupo.split("-")[1].strip()
+                                    if valor:
+                                        ciudad_grupo = valor
+                                        if "-" in ciudad_grupo:
+                                            ciudad_grupo = ciudad_grupo.split("-")[1].strip()
+                                    else:
+                                        ciudad_grupo = ""
                                 elif etiqueta == "Clasificación":
-                                    clasificacion_grupo = valor[0]
+                                    if valor:
+                                        clasificacion_grupo = valor[0]
+                                    else:
+                                        clasificacion_grupo = ""
                                 elif etiqueta == "Área de conocimiento":
-                                    areas_grupo = valor
+                                    if valor:
+                                        areas_grupo = valor
+                                    else:
+                                        areas_grupo = ""
 
                     if primer_td and primer_td.text.strip() == "Integrantes del grupo":
                         filas_tabla = table.find_all('tr')[2:]
@@ -401,7 +418,7 @@ def obtener_nombre_libro(texto_blockquote):
     indice_inicio = texto_blockquote.find('"')
     indice_fin = texto_blockquote.find("En:", indice_inicio)
     
-    if indice_inicio != -1and indice_fin != -1:
+    if indice_inicio != -1 and indice_fin != -1:
         nombre_libro = texto_blockquote[indice_inicio + 1:indice_fin].strip()
         return nombre_libro
     
@@ -641,20 +658,20 @@ try:
                 data_json.append(grupo_data)
 
         # Insertar datos en MongoDB Atlas
-        '''
+        """
         try:
             result = collection.insert_many(data_json)
             print(f"Se insertaron {len(result.inserted_ids)} documentos en MongoDB Atlas")
         except Exception as e:
             print(f"Error al insertar documentos en MongoDB Atlas: {e}")
 
-        print("Resultados almacenados en", archivo_salida_csv, "y en MongoDB Atlas")/*9+8
-        '''
+        print("Resultados almacenados en", archivo_salida_csv, "y en MongoDB Atlas")
+        """
 
 except requests.exceptions.ConnectionError as e:
     print("Error de conexión:", e)
 
-'''
+"""
 finally:
     client.close()
-'''
+"""
