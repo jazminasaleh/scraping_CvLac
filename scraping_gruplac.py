@@ -34,25 +34,25 @@ os.environ['http_proxy'] = ''
 os.environ['https_proxy'] = ''
 
 # URL del GrupLac, se toman los 152 grupos
-url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=152'
+url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=32'
 
 # Los resultados se van a almacenar en un csv con nombre resultados_grupos
 archivo_salida_json = 'resultados_grupos_json.json'
 archivo_salida_csv = 'resultados_grupos_csv.csv'
 
 #Conexion con mongodb
-"""
+"""""
 MONGO_URI = "mongodb+srv://juanitasanabria:XwFAqnuDWYryhzab@cvlacdb.tbchf.mongodb.net/"
 
-
+ 
 try:
     client = MongoClient(MONGO_URI)
     db = client.cvlacdb  # Nombre de la base de datos
     collection = db.grupos  # Nombre de la colección
     print("Conexión a MongoDB Atlas establecida con éxito")
-except ConnectionFailure:
+except ConnectionFailure:|
     print("No se pudo conectar a MongoDB Atlas")
-"""
+"""""
 
 def cargar_paises_espanol():
     paises = []
@@ -139,7 +139,7 @@ def procesar_grupo(fila):
                                         clasificacion_grupo = ""
                                 elif etiqueta == "Área de conocimiento":
                                     if valor:
-                                        areas_grupo = valor
+                                        areas_grupo = valor.split(" -- ")[0]
                                     else:
                                         areas_grupo = ""
 
@@ -274,28 +274,34 @@ def procesar_grupo(fila):
                                                                         pais = ""
                                                                     
                                                                     #Obtener el titulo de la revista donde se público el articulo o Textos en publicaciones no científicas y el pais en caso que no se haya obtennido antes
-                                                                    if tipo_producto == "Artículos":
+                                                                    if tipo_producto == "Artículos" or tipo_producto == "Capitulos de libro":
                                                                         # Suponiendo que 'pais' y 'texto_blockquote' ya están definidos anteriormente
                                                                         if len(pais) == 0:
                                                                             indice_final_pais = texto_blockquote.find("En:") + 3
                                                                             indice_issn = texto_blockquote.find("ISSN:")
+                                                                            indice_isbn = texto_blockquote.find("ISBN:")
                                                                             
-                                                                            # Verificamos que se han encontrado las posiciones
-                                                                            if indice_final_pais != -1 and indice_issn != -1:
-                                                                                texto_despues_pais = texto_blockquote[indice_final_pais:indice_issn]
-                                                                                texto_despues_pais = texto_despues_pais.lstrip()  # Eliminar espacios al principio
+                                                                            if indice_issn != -1 and (indice_isbn == -1 or indice_issn < indice_isbn):
+                                                                                indice_final_dato = indice_issn
+                                                                            elif indice_isbn != -1:
+                                                                                indice_final_dato = indice_isbn
+                                                                            else:
+                                                                                indice_final_dato = -1
+                                                                            
+                                                                            if indice_final_pais != -1 and indice_final_dato != -1:
+                                                                                # Extraer texto entre 'En:' y el próximo 'ISSN' o 'ISBN'
+                                                                                texto_despues_pais = texto_blockquote[indice_final_pais:indice_final_dato].strip()
                                                                                 
-                                                                                # Convertimos a minúsculas los nombres de los países válidos
                                                                                 paises_validos = [p.lower() for p in paises_espanol]
                                                                                 pais_encontrado = False
                                                                                 
                                                                                 for pais_valido in paises_validos:
-                                                                                    # Convertimos el texto a minúsculas para comparación
-                                                                                    nombre_pais = texto_despues_pais.lower()
+                                                                                    nombre_pais = texto_despues_pais.lower().strip()  # Asegurarse de eliminar espacios adicionales
                                                                                     
-                                                                                    # Verificamos si el texto coincide con algún país válido
-                                                                                    if nombre_pais == pais_valido or nombre_pais.startswith(pais_valido + " ") or nombre_pais.startswith(pais_valido):
-                                                                                        pais = pais_valido.capitalize()  # Capitalizamos el nombre del país encontrado
+                                                                                    if (nombre_pais == pais_valido or 
+                                                                                        nombre_pais.startswith(pais_valido + " ") or 
+                                                                                        nombre_pais.startswith(pais_valido)):
+                                                                                        pais = pais_valido.capitalize()
                                                                                         pais_encontrado = True
                                                                                         break
                                                                                 
@@ -304,42 +310,46 @@ def procesar_grupo(fila):
                                                                             else:
                                                                                 pais = ""
 
-                                                                                
-                                                                            if len(texto_despues_pais) > 1:
-                                                                                titulo_revista = texto_despues_pais.replace(pais, "").strip()
-                                                                                if titulo_revista.startswith("No Aplica"):
-                                                                                    titulo_revista = titulo_revista[9:].strip()
+
+                                                                            # Obtener título de revista solo si es un artículo
+                                                                            if tipo_producto == "Artículos":
+                                                                                if len(texto_despues_pais) > 1:
+                                                                                    titulo_revista = texto_despues_pais.replace(pais, "").strip()
+                                                                                    if titulo_revista.startswith("No Aplica"):
+                                                                                        titulo_revista = titulo_revista[9:].strip()
+                                                                                else:
+                                                                                    titulo_revista = ""
                                                                             else:
                                                                                 titulo_revista = ""
-                                                                        else:
-                                                                            indice_final_pais = texto_blockquote.find("En:") + len(pais) + 4
-                                                                            indice_issn = texto_blockquote.find("ISSN:")
-                                                                            texto_despues_pais = texto_blockquote[indice_final_pais:indice_issn]
-                                                                            if len(texto_despues_pais) > 1:
-                                                                                titulo_revista = texto_despues_pais.replace(pais, "").strip()
+
+                                                                        elif tipo_producto == "Textos en publicaciones no científicas":
+                                                                            indice_final_pais = texto_blockquote.find("En:") + len(pais) + 12
+                                                                            indice_issn = texto_blockquote.find("ISSN:") - 1
+                                                                            if indice_issn != -1:
+                                                                                titulo_revista = texto_blockquote[indice_final_pais:indice_issn].strip()
                                                                             else:
                                                                                 titulo_revista = ""
-                                                                                                                                                    
-                                                                    elif  tipo_producto == "Textos en publicaciones no científicas":
-                                                                        indice_final_pais = texto_blockquote.find("En:") + len(pais) + 12
-                                                                        indice_issn = texto_blockquote.find("ISSN:") -1
-                                                                        if indice_issn != -1:
-                                                                            titulo_revista = texto_blockquote[indice_final_pais:indice_issn].strip()
                                                                         else:
                                                                             titulo_revista = ""
-                                                                    else:
-                                                                        titulo_revista = ""
                                                                     
                                                                 issn = ''
                                                                 isbn = ''
+                                                                nombre_libro=''
                                                                 issn = obtener_issn(texto_blockquote)  
                                                                 isbn = obtener_isbn(texto_blockquote)
-                                                                nombre_libro=obtener_nombre_libro(texto_blockquote)
                                                                 editorial = obtener_editorial(texto_blockquote)
                                                                 volumen = obtener_volumen(texto_blockquote)
                                                                 fasciculo = obtener_fasciculo(texto_blockquote)
                                                                 paginas = obtener_paginas(texto_blockquote)
-                                                                año = obtener_año(texto_blockquote)
+                                                                if  tipo_producto == "Artículos" :
+                                                                    año=obtener_año(texto_blockquote)
+                                                                elif  tipo_producto == "Libros":
+                                                                    año=obtener_año_libros(texto_blockquote)
+                                                                elif tipo_producto =="Capitulos de libro":
+                                                                    año=obtener_año_capitulos(texto_blockquote)
+                                                                    nombre_libro=obtener_nombre_libro(texto_blockquote)
+                                                                elif tipo_producto=="Textos en publicaciones no científicas":
+                                                                    año = obtener_año_en_textos(texto_blockquote)
                                                                 doi = obtener_doi(texto_blockquote)
                                                                 palabras = obtener_palabras_clave(texto_blockquote)
                                                                 areas = obtener_areas(texto_blockquote)
@@ -415,14 +425,20 @@ def obtener_isbn(texto_blockquote):
     return ""
 
 def obtener_nombre_libro(texto_blockquote):
-    indice_inicio = texto_blockquote.find('"')
-    indice_fin = texto_blockquote.find("En:", indice_inicio)
+    indice_inicio_comillas = texto_blockquote.find('"')
+    indice_fin_comillas = texto_blockquote.find('"', indice_inicio_comillas + 1)
+    indice_en = texto_blockquote.find("En:", indice_fin_comillas)
     
-    if indice_inicio != -1 and indice_fin != -1:
-        nombre_libro = texto_blockquote[indice_inicio + 1:indice_fin].strip()
-        return nombre_libro
+    if indice_inicio_comillas != -1 and indice_fin_comillas != -1 and indice_en != -1:
+        texto_despues_comillas = texto_blockquote[indice_fin_comillas + 1:indice_en].strip()
+        
+        if texto_despues_comillas and len(texto_despues_comillas) > 1 and texto_despues_comillas != ".":
+            return texto_despues_comillas
     
-    return""
+    return ""
+
+
+
 
 def obtener_editorial(texto_blockquote):
     indice_ed = texto_blockquote.find("ed:")
@@ -489,7 +505,6 @@ def obtener_paginas(texto_blockquote):
         return f"{resultado_pagina.group(1)}-{resultado_pagina.group(2)}"
     return ""
 
- # Obtener año de publicación
 def obtener_año(texto_blockquote):
     indices_comas = [m.start() for m in re.finditer(r',', texto_blockquote)]
     indices_puntos = [m.start() for m in re.finditer(r'. ', texto_blockquote)]
@@ -506,6 +521,29 @@ def obtener_año(texto_blockquote):
     
     return ""
 
+def obtener_año_libros(texto_blockquote):
+    patron = r"En:\s*.*?(\d{4})\."
+    coincidencia = re.search(patron, texto_blockquote)
+    
+    if coincidencia:
+        return coincidencia.group(1)
+    return ""
+
+def obtener_año_capitulos(texto_blockquote):
+    patron = r",\s*(\d{4})(?!\d)"
+    coincidencias = re.findall(patron, texto_blockquote.strip())
+    
+    if coincidencias:
+        return coincidencias[-1]
+    return ""
+def obtener_año_en_textos(texto_blockquote):
+    patron = r"En:\s*[^.]+\.\s*(\d{4})"
+    coincidencia = re.search(patron, texto_blockquote)
+    
+    if coincidencia:
+        return coincidencia.group(1)
+    return ""
+    
 def obtener_doi(texto_blockquote):
     indice_doi = texto_blockquote.find("DOI:")
     if indice_doi != -1:
@@ -522,18 +560,26 @@ def obtener_doi(texto_blockquote):
             return texto_blockquote[indice_doi + len("DOI:"):].strip()
     return ""
 
-#Obtener palabras claves de la publicacion
+# Obtener palabras claves de la publicación
 def obtener_palabras_clave(texto_blockquote):
     indice_palabras = texto_blockquote.find("Palabras:")
     if indice_palabras != -1:
         indice_sectores = texto_blockquote.find("Sectores:", indice_palabras)
-        if indice_sectores != -1:
-            palabras_texto = texto_blockquote[indice_palabras + len("Palabras:"):indice_sectores].strip()
+        indice_areas = texto_blockquote.find("Areas:", indice_palabras)
+        
+        if indice_sectores != -1 and (indice_sectores < indice_areas or indice_areas == -1):
+            fin_palabras = indice_sectores
+        elif indice_areas != -1:
+            fin_palabras = indice_areas
         else:
-            palabras_texto = texto_blockquote[indice_palabras + len("Palabras:"):].strip()
+            fin_palabras = len(texto_blockquote)
+        
+        palabras_texto = texto_blockquote[indice_palabras + len("Palabras:"):fin_palabras].strip()
         palabras_limpio = [palabra.strip() for palabra in palabras_texto.split(",") if palabra.strip()]
         return ', '.join(palabras_limpio)
+    
     return ""
+
 
 def obtener_areas(texto_blockquote):
     indice_areas = texto_blockquote.find("Areas:")
@@ -556,24 +602,30 @@ def obtener_sectores(texto_blockquote):
     return ""
 
 def obtener_integrantes(texto_blockquote, indice_comilla1):
-    nombres_integrantes = texto_blockquote[:indice_comilla1].split(',')
+    partes = texto_blockquote[:indice_comilla1].split('Tipo: ')
     nombres_integrantes_limpios = []
-    for nombre in nombres_integrantes:
-        indice_tipo_capitulo = nombre.find("Tipo: Capítulo de libro")
-        indice_tipo_otro_capitulo = nombre.find("Tipo: Otro capítulo de libro publicado")
-        
-        if indice_tipo_capitulo != -1:
-            indice_tipo = indice_tipo_capitulo
-        elif indice_tipo_otro_capitulo != -1:
-            indice_tipo = indice_tipo_otro_capitulo
-        else:
-            nombre_limpio = re.sub(r"['\\]", '', nombre.strip())
-            if nombre_limpio:
-                nombres_integrantes_limpios.append(nombre_limpio.title())
+    
+    for parte in partes:
+        if not parte.strip():
             continue
         
-        nombre_limpio = re.sub(r"['\\]", '', nombre[:indice_tipo].strip())
-        nombres_integrantes_limpios.append(nombre_limpio.title())
+        indice_inicio_nombre = parte.find('publicado')
+        if indice_inicio_nombre != -1:
+            nombre = parte[indice_inicio_nombre + len('publicado'):].strip()
+        else:
+            indice_inicio_nombre = parte.find('Capítulo de libro')
+            if indice_inicio_nombre != -1:
+                nombre = parte[indice_inicio_nombre + len('Capítulo de libro'):].strip()
+            else:
+                nombre = parte.strip()
+
+        nombre_limpio = re.sub(r"['\\]", '', nombre).strip(',')
+        
+        if "Capítulo de libro" in nombre_limpio:
+            continue
+        
+        if nombre_limpio and not nombre_limpio.isspace():
+            nombres_integrantes_limpios.append(nombre_limpio.title())
     
     return ', '.join(nombres_integrantes_limpios)
 
@@ -658,7 +710,7 @@ try:
                 data_json.append(grupo_data)
 
         # Insertar datos en MongoDB Atlas
-        """
+        """""
         try:
             result = collection.insert_many(data_json)
             print(f"Se insertaron {len(result.inserted_ids)} documentos en MongoDB Atlas")
@@ -666,12 +718,12 @@ try:
             print(f"Error al insertar documentos en MongoDB Atlas: {e}")
 
         print("Resultados almacenados en", archivo_salida_csv, "y en MongoDB Atlas")
-        """
+        """""
 
 except requests.exceptions.ConnectionError as e:
     print("Error de conexión:", e)
 
-"""
+"""""
 finally:
     client.close()
-"""
+"""""
