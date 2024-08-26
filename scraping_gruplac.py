@@ -34,7 +34,7 @@ os.environ['http_proxy'] = ''
 os.environ['https_proxy'] = ''
 
 # URL del GrupLac, se toman los 152 grupos
-url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=152'
+url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=3'
 
 # Los resultados se van a almacenar en un csv con nombre resultados_grupos
 archivo_salida_json = 'resultados_grupos_json.json'
@@ -331,6 +331,40 @@ def procesar_grupo(fila):
                                                                             titulo_revista = texto_blockquote[indice_final_pais:indice_issn].strip()
                                                                         else:
                                                                             titulo_revista = ""
+                                                                    elif tipo_producto == "Capitulos de libro":
+                                                                        if len(pais) == 0:
+                                                                            indice_final_pais = texto_blockquote.find("En:") + 3
+                                                                            indice_issn = texto_blockquote.find("ISSN:")
+                                                                            indice_isbn = texto_blockquote.find("ISBN:")
+                                                                            
+                                                                            if indice_issn != -1 and (indice_isbn == -1 or indice_issn < indice_isbn):
+                                                                                indice_final_dato = indice_issn
+                                                                            elif indice_isbn != -1:
+                                                                                indice_final_dato = indice_isbn
+                                                                            else:
+                                                                                indice_final_dato = -1
+                                                                            
+                                                                            if indice_final_pais != -1 and indice_final_dato != -1:
+                                                                                # Extraer texto entre 'En:' y el próximo 'ISSN' o 'ISBN'
+                                                                                texto_despues_pais = texto_blockquote[indice_final_pais:indice_final_dato].strip()
+                                                                                
+                                                                                paises_validos = [p.lower() for p in paises_espanol]
+                                                                                pais_encontrado = False
+                                                                                
+                                                                                for pais_valido in paises_validos:
+                                                                                    nombre_pais = texto_despues_pais.lower().strip()  # Asegurarse de eliminar espacios adicionales
+                                                                                    
+                                                                                    if (nombre_pais == pais_valido or 
+                                                                                        nombre_pais.startswith(pais_valido + " ") or 
+                                                                                        nombre_pais.startswith(pais_valido)):
+                                                                                        pais = pais_valido.capitalize()
+                                                                                        pais_encontrado = True
+                                                                                        break
+                                                                                
+                                                                                if not pais_encontrado:
+                                                                                    pais = ""
+                                                                            else:
+                                                                                pais = ""
                                                                     else:
                                                                         titulo_revista = ""
                                                                 issn = ''
