@@ -34,7 +34,7 @@ os.environ['http_proxy'] = ''
 os.environ['https_proxy'] = ''
 
 # URL del GrupLac, se toman los 152 grupos
-url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=32'
+url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=152'
 
 # Los resultados se van a almacenar en un csv con nombre resultados_grupos
 archivo_salida_json = 'resultados_grupos_json.json'
@@ -44,13 +44,13 @@ archivo_salida_csv = 'resultados_grupos_csv.csv'
 """""
 MONGO_URI = "mongodb+srv://juanitasanabria:XwFAqnuDWYryhzab@cvlacdb.tbchf.mongodb.net/"
 
- 
+
 try:
     client = MongoClient(MONGO_URI)
     db = client.cvlacdb  # Nombre de la base de datos
     collection = db.grupos  # Nombre de la colección
     print("Conexión a MongoDB Atlas establecida con éxito")
-except ConnectionFailure:|
+except ConnectionFailure:
     print("No se pudo conectar a MongoDB Atlas")
 """""
 
@@ -274,64 +274,65 @@ def procesar_grupo(fila):
                                                                         pais = ""
                                                                     
                                                                     #Obtener el titulo de la revista donde se público el articulo o Textos en publicaciones no científicas y el pais en caso que no se haya obtennido antes
-                                                                    if tipo_producto == "Artículos" or tipo_producto == "Capitulos de libro":
+                                                                    if tipo_producto == "Artículos":
                                                                         # Suponiendo que 'pais' y 'texto_blockquote' ya están definidos anteriormente
                                                                         if len(pais) == 0:
                                                                             indice_final_pais = texto_blockquote.find("En:") + 3
                                                                             indice_issn = texto_blockquote.find("ISSN:")
-                                                                            indice_isbn = texto_blockquote.find("ISBN:")
-                                                                            
-                                                                            if indice_issn != -1 and (indice_isbn == -1 or indice_issn < indice_isbn):
-                                                                                indice_final_dato = indice_issn
-                                                                            elif indice_isbn != -1:
-                                                                                indice_final_dato = indice_isbn
-                                                                            else:
-                                                                                indice_final_dato = -1
-                                                                            
-                                                                            if indice_final_pais != -1 and indice_final_dato != -1:
-                                                                                # Extraer texto entre 'En:' y el próximo 'ISSN' o 'ISBN'
-                                                                                texto_despues_pais = texto_blockquote[indice_final_pais:indice_final_dato].strip()
-                                                                                
+
+                                                                            # Verificamos que se han encontrado las posiciones
+                                                                            if indice_final_pais != -1 and indice_issn != -1:
+                                                                                texto_despues_pais = texto_blockquote[indice_final_pais:indice_issn]
+                                                                                texto_despues_pais = texto_despues_pais.lstrip()  # Eliminar espacios al principio
+
+                                                                                # Convertimos a minúsculas los nombres de los países válidos
                                                                                 paises_validos = [p.lower() for p in paises_espanol]
                                                                                 pais_encontrado = False
-                                                                                
+
                                                                                 for pais_valido in paises_validos:
-                                                                                    nombre_pais = texto_despues_pais.lower().strip()  # Asegurarse de eliminar espacios adicionales
-                                                                                    
-                                                                                    if (nombre_pais == pais_valido or 
-                                                                                        nombre_pais.startswith(pais_valido + " ") or 
-                                                                                        nombre_pais.startswith(pais_valido)):
-                                                                                        pais = pais_valido.capitalize()
+                                                                                    # Convertimos el texto a minúsculas para comparación
+                                                                                    nombre_pais = texto_despues_pais.lower()
+
+                                                                                    # Verificamos si el texto coincide con algún país válido
+                                                                                    if nombre_pais == pais_valido or nombre_pais.startswith(pais_valido + " ") or nombre_pais.startswith(pais_valido):
+                                                                                        pais = pais_valido.capitalize()  # Capitalizamos el nombre del país encontrado
                                                                                         pais_encontrado = True
                                                                                         break
-                                                                                
+
                                                                                 if not pais_encontrado:
                                                                                     pais = ""
                                                                             else:
                                                                                 pais = ""
 
-
-                                                                            # Obtener título de revista solo si es un artículo
-                                                                            if tipo_producto == "Artículos":
-                                                                                if len(texto_despues_pais) > 1:
-                                                                                    titulo_revista = texto_despues_pais.replace(pais, "").strip()
-                                                                                    if titulo_revista.startswith("No Aplica"):
-                                                                                        titulo_revista = titulo_revista[9:].strip()
-                                                                                else:
-                                                                                    titulo_revista = ""
-                                                                            else:
-                                                                                titulo_revista = ""
-
-                                                                        elif tipo_producto == "Textos en publicaciones no científicas":
-                                                                            indice_final_pais = texto_blockquote.find("En:") + len(pais) + 12
-                                                                            indice_issn = texto_blockquote.find("ISSN:") - 1
-                                                                            if indice_issn != -1:
-                                                                                titulo_revista = texto_blockquote[indice_final_pais:indice_issn].strip()
+                                                                            if len(texto_despues_pais) > 1:
+                                                                                titulo_revista = texto_despues_pais.replace(pais, "").strip()
+                                                                                if "revista" in titulo_revista.lower():
+                                                                                    indice_revista = titulo_revista.lower().find("revista")
+                                                                                    titulo_revista = titulo_revista[indice_revista:].strip()
+                                                                                if titulo_revista.startswith("No Aplica"):
+                                                                                    titulo_revista = titulo_revista[9:].strip()
+                                                                                elif titulo_revista.startswith('" . En:'):
+                                                                                    titulo_revista = titulo_revista[7:].strip()
                                                                             else:
                                                                                 titulo_revista = ""
                                                                         else:
+                                                                            indice_final_pais = texto_blockquote.find("En:") + len(pais) + 4
+                                                                            indice_issn = texto_blockquote.find("ISSN:")
+                                                                            texto_despues_pais = texto_blockquote[indice_final_pais:indice_issn]
+                                                                            if len(texto_despues_pais) > 1:
+                                                                                titulo_revista = texto_despues_pais.replace(pais, "").strip()
+                                                                            else:
+                                                                                titulo_revista = ""
+
+                                                                    elif  tipo_producto == "Textos en publicaciones no científicas":
+                                                                        indice_final_pais = texto_blockquote.find("En:") + len(pais) + 12
+                                                                        indice_issn = texto_blockquote.find("ISSN:") -1
+                                                                        if indice_issn != -1:
+                                                                            titulo_revista = texto_blockquote[indice_final_pais:indice_issn].strip()
+                                                                        else:
                                                                             titulo_revista = ""
-                                                                    
+                                                                    else:
+                                                                        titulo_revista = ""
                                                                 issn = ''
                                                                 isbn = ''
                                                                 nombre_libro=''
@@ -536,6 +537,7 @@ def obtener_año_capitulos(texto_blockquote):
     if coincidencias:
         return coincidencias[-1]
     return ""
+
 def obtener_año_en_textos(texto_blockquote):
     patron = r"En:\s*[^.]+\.\s*(\d{4})"
     coincidencia = re.search(patron, texto_blockquote)
@@ -720,6 +722,110 @@ try:
         print("Resultados almacenados en", archivo_salida_csv, "y en MongoDB Atlas")
         """""
 
+        """""
+        #  actualizacion 
+
+        for grupo_data in data_json:
+            filtro_grupo = {'Nombre del grupo': grupo_data['Nombre del grupo']}
+            cambios_grupo = {
+                '$set': {
+                    'Enlace al GrupLac': grupo_data['Enlace al GrupLac'],
+                    'Fecha de formcación': grupo_data['Fecha de formcación'],
+                    'Departamento - ciudad': grupo_data['Departamento - ciudad'],
+                    'Clasificación': grupo_data['Clasificación'],
+                    'Área de conocimiento': grupo_data['Área de conocimiento'],
+                    'Nombre del líder': grupo_data['Nombre del líder'],
+                    'Enlace al CvLac líder': grupo_data['Enlace al CvLac líder'],
+                }
+            }
+
+            # Actualizar el grupo principal
+            resultado_grupo = collection.update_one(filtro_grupo, cambios_grupo, upsert=True)
+
+            if resultado_grupo.matched_count > 0:
+                print(f"Grupo actualizado: {grupo_data['Nombre del grupo']}")
+            else:
+                print(f"Grupo insertado: {grupo_data['Nombre del grupo']}")
+
+            for integrante in grupo_data['Integrantes']:
+                filtro_integrante = {'Nombre del grupo': grupo_data['Nombre del grupo'], 'Integrantes.Nombre del integrante': integrante['Nombre del integrante']}
+                cambios_integrante = {
+                    '$set': {
+                        'Integrantes.$.Enlace al CvLac del investigador': integrante['Enlace al CvLac del investigador'],
+                        'Integrantes.$.Nombre en citaciones': integrante['Nombre en citaciones'],
+                        'Integrantes.$.Nacionalidad': integrante['Nacionalidad'],
+                        'Integrantes.$.Sexo': integrante['Sexo'],
+                        'Integrantes.$.Categoría': integrante['Categoría'],
+                        'Integrantes.$.Publicaciones': integrante['Publicaciones']
+                    }
+                }
+
+                # Actualizar el investigador específico
+                resultado_integrante = collection.update_one(filtro_integrante, cambios_integrante)
+
+                if resultado_integrante.matched_count == 0:
+                    # Si no se encontró el integrante, añadirlo al array
+                    collection.update_one(
+                        {'Nombre del grupo': grupo_data['Nombre del grupo']},
+                        {'$push': {'Integrantes': integrante_data}}
+                    )
+                    print(f"Nuevo integrante añadido: {integrante['Nombre del integrante']}")
+                else:
+                    print(f"Integrante actualizado: {integrante['Nombre del integrante']}")
+
+                for publicacion in integrante['Publicaciones']:
+                    filtro_publicacion = {
+                        'Nombre del grupo': grupo_data['Nombre del grupo'],
+                        'Integrantes.Nombre del integrante': integrante['Nombre del integrante'],
+                        'Integrantes.Publicaciones.Título publicación': publicacion['Título publicación'],
+                    }
+                    cambios_publicacion = {
+                        '$set': {
+                            'Integrantes.$[i].Publicaciones.$[j].Integrantes involucrados': publicacion['Integrantes involucrados'],
+                            'Integrantes.$[i].Publicaciones.$[j].Tipo producto': publicacion['Tipo producto'],
+                            'Integrantes.$[i].Publicaciones.$[j].Tipo publicación': publicacion['Tipo publicación'],
+                            'Integrantes.$[i].Publicaciones.$[j].Estado': publicacion['Estado'],
+                            'Integrantes.$[i].Publicaciones.$[j].País': publicacion['País'],
+                            'Integrantes.$[i].Publicaciones.$[j].Titulo revista': publicacion['Titulo revista'],
+                            'Integrantes.$[i].Publicaciones.$[j].ISSN': publicacion['ISSN'],
+                            'Integrantes.$[i].Publicaciones.$[j].Editorial': publicacion['Editorial'],
+                            'Integrantes.$[i].Publicaciones.$[j].Volumen': publicacion['Volumen'],
+                            'Integrantes.$[i].Publicaciones.$[j].Fascículo': publicacion['Fascículo'],
+                            'Integrantes.$[i].Publicaciones.$[j].Páginas': publicacion['Páginas'],
+                            'Integrantes.$[i].Publicaciones.$[j].Año publicación': publicacion['Año publicación'],
+                            'Integrantes.$[i].Publicaciones.$[j].DOI': publicacion['DOI'],
+                            'Integrantes.$[i].Publicaciones.$[j].Palabras clave': publicacion['Palabras clave'],
+                            'Integrantes.$[i].Publicaciones.$[j].Areas': publicacion['Areas'],
+                            'Integrantes.$[i].Publicaciones.$[j].Sectores': publicacion['Sectores']
+                        }
+                    }
+                    opciones = {
+                        'arrayFilters': [
+                            {'i.Nombre del integrante': integrante['Nombre del integrante']},
+                            {'j.Título publicación': publicacion['Título publicación']}
+                        ]
+                    }
+
+                    # Actualizar la publicación específica
+                    resultado_publicacion = collection.update_one(filtro_publicacion, cambios_publicacion, array_filters=opciones['arrayFilters'])
+
+                    if resultado_publicacion.matched_count == 0:
+                        # Si no se encontró la publicación, añadirla al array de publicaciones del integrante
+                        collection.update_one(
+                            {
+                                'Nombre del grupo': grupo_data['Nombre del grupo'],
+                                'Integrantes.Nombre del integrante': integrante['Nombre del integrante']
+                            },
+                            {
+                                '$push': {
+                                    'Integrantes.$.Publicaciones': publicacion_data
+                                }
+                            }
+                        )
+                        print(f"Nueva publicación añadida: {publicacion['Título publicación']}")
+                    else:
+                        print(f"Publicación actualizada: {publicacion['Título publicación']}")
+                """""
 except requests.exceptions.ConnectionError as e:
     print("Error de conexión:", e)
 
