@@ -234,7 +234,7 @@ def procesar_grupo(fila):
                                                             if indice_comilla2 != -1:
                                                                 titulo_publicacion = texto_blockquote[indice_comilla1 + 1:indice_comilla2]
                                                                 tipo_publicacion = tipo_publicacion.title()
-                                                                
+                                                                print(titulo_publicacion)
                                                                 indice_pais = texto_blockquote.find("En:")
                                                                 if indice_pais != -1:
                                                                     indice_palabra_despues_de_en = indice_pais + len("En:")
@@ -344,6 +344,7 @@ def procesar_grupo(fila):
                                                                 paginas = obtener_paginas(texto_blockquote)
                                                                 if  tipo_producto == "Artículos" :
                                                                     año=obtener_año(texto_blockquote)
+                                                                    print(año)
                                                                 elif  tipo_producto == "Libros":
                                                                     año=obtener_año_libros(texto_blockquote)
                                                                 elif tipo_producto =="Capitulos de libro":
@@ -485,8 +486,6 @@ def obtener_volumen(texto_blockquote):
     
     return ""
 
-
-
 def obtener_fasciculo(texto_blockquote):
     indice_fasc = texto_blockquote.find("fasc.", texto_blockquote.find("v."))
     if indice_fasc != -1:
@@ -507,19 +506,30 @@ def obtener_paginas(texto_blockquote):
     return ""
 
 def obtener_año(texto_blockquote):
-    indices_comas = [m.start() for m in re.finditer(r',', texto_blockquote)]
-    indices_puntos = [m.start() for m in re.finditer(r'. ', texto_blockquote)]
+    # Buscamos el patrón de páginas seguido de una coma y luego un posible año
+    patron_paginas = re.compile(r'p\.\d+\s*-\s*\d+\s*,\s*(\d{4})')
+    match_paginas = patron_paginas.search(texto_blockquote)
     
+    if match_paginas:
+        posible_año = match_paginas.group(1)
+        return posible_año
+    
+    # Si no encontramos el año después del rango de páginas, continuamos con las búsquedas previas
+    indices_comas = [m.start() for m in re.finditer(r',', texto_blockquote)]
+    indices_puntos = [m.start() for m in re.finditer(r'\. ', texto_blockquote)]
+    
+    # Búsqueda de un posible año entre comas
     for i in range(len(indices_comas) - 1):
         posible_año = texto_blockquote[indices_comas[i] + 1:indices_comas[i + 1]].strip()
         if posible_año.isdigit() and len(posible_año) == 4:
             return posible_año
     
+    # Búsqueda de un posible año después de un punto
     for indice_punto in indices_puntos:
         posible_año = texto_blockquote[indice_punto + 2:indice_punto + 6]
         if posible_año.isdigit():
             return posible_año
-    
+    print(posible_año)
     return ""
 
 def obtener_año_libros(texto_blockquote):
