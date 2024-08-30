@@ -84,7 +84,7 @@ def procesar_grupo(fila):
             nombre_grupo = enlace_grupo.text.strip()
             href_enlace = enlace_grupo.get('href')
             numero_url = href_enlace.split('=')[-1]
-            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro={numero_url}'
+            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro=00000000008806'
             # Obtener el nombre del líder y el enlace a su CvLac
             nombre_lider = columnas[3].text.strip()
 
@@ -386,6 +386,7 @@ def procesar_grupo(fila):
                                                         issn = ''
                                                         isbn = ''
                                                         nombre_libro=''
+                                                        nombres_integrantes_str=''
                                                         issn = obtener_issn(texto_blockquote)  
                                                         isbn = obtener_isbn(texto_blockquote)
                                                         editorial = obtener_editorial(texto_blockquote)
@@ -398,6 +399,7 @@ def procesar_grupo(fila):
                                                             año=obtener_año_libros(texto_blockquote)
                                                         elif tipo_producto =="Capitulos de libro":
                                                             año=obtener_año_capitulos(texto_blockquote)
+                                                            nombres_integrantes_str = obtener_integrantes(texto_blockquote,  indice_comilla1, tipo_producto)
                                                             nombre_libro=obtener_nombre_libro(texto_blockquote)
                                                         elif tipo_producto=="Textos en publicaciones no científicas":
                                                             año = obtener_año_en_textos(texto_blockquote)
@@ -405,7 +407,7 @@ def procesar_grupo(fila):
                                                         palabras = obtener_palabras_clave(texto_blockquote)
                                                         areas = obtener_areas(texto_blockquote)
                                                         sectores = obtener_sectores(texto_blockquote)
-                                                        nombres_integrantes_str = obtener_integrantes(texto_blockquote,  indice_comilla1)
+                                                        #nombres_integrantes_str = obtener_integrantes(texto_blockquote,  indice_comilla1, tipo_producto)
                                                         nombres_integrantes_lista = nombres_integrantes_str.split(',')
                                                         
                                                         publicacion_existente = next((a for a in publicaciones if a[0] == titulo_publicacion), None)
@@ -661,33 +663,35 @@ def obtener_sectores(texto_blockquote):
         return ', '.join(sectores_limpio)
     return ""
 
-def obtener_integrantes(texto_blockquote, indice_comilla1):
-    partes = texto_blockquote[:indice_comilla1].split('Tipo: ')
-    nombres_integrantes_limpios = []
+def obtener_integrantes(texto_blockquote, indice_comilla1, tipo_producto):
+    if tipo_producto == "Capitulos de libro":
+        partes = texto_blockquote[:indice_comilla1].split('Tipo: ')
+        nombres_integrantes_limpios = []
     
-    for parte in partes:
-        if not parte.strip():
-            continue
-        
-        indice_inicio_nombre = parte.find('publicado')
-        if indice_inicio_nombre != -1:
-            nombre = parte[indice_inicio_nombre + len('publicado'):].strip()
-        else:
-            indice_inicio_nombre = parte.find('Capítulo de libro')
+        for parte in partes:
+            if not parte.strip():
+                continue
+            
+            indice_inicio_nombre = parte.find('publicado')
             if indice_inicio_nombre != -1:
-                nombre = parte[indice_inicio_nombre + len('Capítulo de libro'):].strip()
+                nombre = parte[indice_inicio_nombre + len('publicado'):].strip()
             else:
-                nombre = parte.strip()
+                indice_inicio_nombre = parte.find('Capítulo de libro')
+                if indice_inicio_nombre != -1:
+                    nombre = parte[indice_inicio_nombre + len('Capítulo de libro'):].strip()
+                else:
+                    nombre = parte.strip()
 
-        nombre_limpio = re.sub(r"['\\]", '', nombre).strip(',')
+            nombre_limpio = re.sub(r"['\\]", '', nombre).strip(',')
+            
+            if "Capítulo de libro" in nombre_limpio:
+                continue
+            
+            if nombre_limpio and not nombre_limpio.isspace():
+                nombres_integrantes_limpios.append(nombre_limpio.title())
         
-        if "Capítulo de libro" in nombre_limpio:
-            continue
-        
-        if nombre_limpio and not nombre_limpio.isspace():
-            nombres_integrantes_limpios.append(nombre_limpio.title())
-    
-    return ', '.join(nombres_integrantes_limpios)
+            return ', '.join(nombres_integrantes_limpios)
+          
 
 try:
     # Realizar la solicitud HTTP
