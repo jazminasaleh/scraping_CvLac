@@ -180,7 +180,7 @@ def procesar_grupo(fila):
                                         sexo_td = table_cvlac.find('td', string='Sexo')
                                         if sexo_td:
                                             sexo = sexo_td.find_next('td').text.strip()
-                                        else:
+                                        if sexo == '':
                                             sexo = 'No tiene'
 
                                         categoria_td = table_cvlac.find('td', string='Categoría')
@@ -190,8 +190,9 @@ def procesar_grupo(fila):
                                             ultimo_paren = categoria.rfind(')')
                                             if ultimo_paren != -1:
                                                 categoria = categoria[:ultimo_paren + 1].strip()
-                                        else:
+                                        if categoria == '':
                                             categoria = 'Sin categoría'
+                                            
                                         # Buscar la sección de 'Artículos','Libros','Capitulos de libro', 'Textos en publicaciones no científicas'
                                         seccion_publicacion = table_cvlac.find('h3', string=['Artículos','Libros','Capitulos de libro', 'Textos en publicaciones no científicas'])
                                         if seccion_publicacion:
