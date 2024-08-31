@@ -34,14 +34,14 @@ os.environ['http_proxy'] = ''
 os.environ['https_proxy'] = ''
 
 # URL del GrupLac, se toman los 152 grupos
-url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=1'
+url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=152'
 
 # Los resultados se van a almacenar en un csv con nombre resultados_grupos
 archivo_salida_json = 'resultados_grupos_json.json'
 archivo_salida_csv = 'resultados_grupos_csv.csv'
 
 #Conexion con mongodb
-"""
+"""""
 MONGO_URI = "mongodb+srv://juanitasanabria:XwFAqnuDWYryhzab@cvlacdb.tbchf.mongodb.net/"
 
 
@@ -52,7 +52,7 @@ try:
     print("Conexión a MongoDB Atlas establecida con éxito")
 except ConnectionFailure:
     print("No se pudo conectar a MongoDB Atlas")
-"""
+"""""
 
 def cargar_paises_espanol():
     paises = []
@@ -192,7 +192,7 @@ def procesar_grupo(fila):
                                                 categoria = categoria[:ultimo_paren + 1].strip()
                                         if categoria == '':
                                             categoria = 'Sin categoría'
-                                            
+
                                         # Buscar la sección de 'Artículos','Libros','Capitulos de libro', 'Textos en publicaciones no científicas'
                                         seccion_publicacion = table_cvlac.find('h3', string=['Artículos','Libros','Capitulos de libro', 'Textos en publicaciones no científicas'])
                                         if seccion_publicacion:
@@ -232,27 +232,16 @@ def procesar_grupo(fila):
                                                         texto_blockquote = elementos_blockquote.get_text(strip=True)
                                                         texto_blockquote = " ".join(texto_blockquote.split()) 
                                                        
-                                                        indice_comilla1 = texto_blockquote.find('""')
-
+                                                        indice_comilla1 = texto_blockquote.find('"')
                                                         if indice_comilla1 != -1:
-                                                            # Buscar la siguiente comilla después del primer par de comillas dobles
-                                                            indice_comilla2 = texto_blockquote.find('"', indice_comilla1 + 2)
+                                                            indice_comilla2 = texto_blockquote.find('"', indice_comilla1 + 1)
+                                                            #Obtener titulo de la publicación
                                                             if indice_comilla2 != -1:
-                                                                titulo_publicacion = texto_blockquote[indice_comilla1 + 2:indice_comilla2]
-                                                                titulo_publicacion = titulo_publicacion.strip('"')
-                                                        else :
-                                                            # Si no se encuentran comillas dobles consecutivas, buscar comillas simples con o sin espacios
-                                                            indice_comilla1 = texto_blockquote.find('"')
-                                                            if indice_comilla1 != -1:
-                                                                # Manejo del caso de comillas con espacios: ' " ' o '""'
-                                                                indice_comilla2 = texto_blockquote.find('"', indice_comilla1 + 1)
-                                                                if indice_comilla2 != -1:
-                                                                    # Captura el título eliminando comillas y espacios adicionales
-                                                                    titulo_publicacion = texto_blockquote[indice_comilla1 + 1:indice_comilla2]
-                                                                    titulo_publicacion = titulo_publicacion.strip('"').strip()
-                                                            
-                                                        indice_pais = texto_blockquote.find("En:")
-                                                        if indice_pais != -1:
+                                                                titulo_publicacion = texto_blockquote[indice_comilla1 + 1:indice_comilla2]
+                                                                tipo_publicacion = tipo_publicacion.title()
+                                                                
+                                                                indice_pais = texto_blockquote.find("En:")
+                                                                if indice_pais != -1:
                                                                     indice_palabra_despues_de_en = indice_pais + len("En:")
                                                                    
                                                                     palabras = []
@@ -383,43 +372,43 @@ def procesar_grupo(fila):
                                                                                 pais = ""
                                                                     else:
                                                                         titulo_revista = ""
-                                                        issn = ''
-                                                        isbn = ''
-                                                        nombre_libro=''
-                                                        issn = obtener_issn(texto_blockquote)  
-                                                        isbn = obtener_isbn(texto_blockquote)
-                                                        editorial = obtener_editorial(texto_blockquote)
-                                                        volumen = obtener_volumen(texto_blockquote)
-                                                        fasciculo = obtener_fasciculo(texto_blockquote)
-                                                        paginas = obtener_paginas(texto_blockquote)
-                                                        if  tipo_producto == "Artículos" :
-                                                            año=obtener_año(texto_blockquote)
-                                                        elif  tipo_producto == "Libros":
-                                                            año=obtener_año_libros(texto_blockquote)
-                                                        elif tipo_producto =="Capitulos de libro":
-                                                            año=obtener_año_capitulos(texto_blockquote)
-                                                            nombre_libro=obtener_nombre_libro(texto_blockquote)
-                                                        elif tipo_producto=="Textos en publicaciones no científicas":
-                                                            año = obtener_año_en_textos(texto_blockquote)
-                                                        doi = obtener_doi(texto_blockquote)
-                                                        palabras = obtener_palabras_clave(texto_blockquote)
-                                                        areas = obtener_areas(texto_blockquote)
-                                                        sectores = obtener_sectores(texto_blockquote)
-                                                        nombres_integrantes_str = obtener_integrantes(texto_blockquote,  indice_comilla1)
-                                                        nombres_integrantes_lista = nombres_integrantes_str.split(',')
-                                                        
-                                                        publicacion_existente = next((a for a in publicaciones if a[0] == titulo_publicacion), None)
-                                                                                                                      
-                                                        if publicacion_existente is not None:
-                                                            if isinstance(publicacion_existente[1], list):
-                                                                publicacion_existente[1].extend([nombre for nombre in nombres_integrantes_lista if nombre.strip() and nombre.strip() not in publicacion_existente[1]])
-                                                            else:
-                                                                # Si publicacion_existente[1] no es una lista, puedes crear una nueva lista con los nombres anteriores y los nuevos
-                                                                publicacion_existente = list(publicacion_existente)
-                                                                publicacion_existente[1] = publicacion_existente[1].split(', ') + [nombre for nombre in nombres_integrantes_lista if nombre.strip() and nombre.strip() not in publicacion_existente[1]]
-                                                        else:
-                                                            # Si el artículo no está en la lista, agregarlo
-                                                           publicaciones.append((titulo_publicacion, nombres_integrantes_str,  tipo_producto, tipo_publicacion, estado, pais, titulo_revista,nombre_libro, issn,isbn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores))
+                                                                issn = ''
+                                                                isbn = ''
+                                                                nombre_libro=''
+                                                                issn = obtener_issn(texto_blockquote)  
+                                                                isbn = obtener_isbn(texto_blockquote)
+                                                                editorial = obtener_editorial(texto_blockquote)
+                                                                volumen = obtener_volumen(texto_blockquote)
+                                                                fasciculo = obtener_fasciculo(texto_blockquote)
+                                                                paginas = obtener_paginas(texto_blockquote)
+                                                                if  tipo_producto == "Artículos" :
+                                                                    año=obtener_año(texto_blockquote)
+                                                                elif  tipo_producto == "Libros":
+                                                                    año=obtener_año_libros(texto_blockquote)
+                                                                elif tipo_producto =="Capitulos de libro":
+                                                                    año=obtener_año_capitulos(texto_blockquote)
+                                                                    nombre_libro=obtener_nombre_libro(texto_blockquote)
+                                                                elif tipo_producto=="Textos en publicaciones no científicas":
+                                                                    año = obtener_año_en_textos(texto_blockquote)
+                                                                doi = obtener_doi(texto_blockquote)
+                                                                palabras = obtener_palabras_clave(texto_blockquote)
+                                                                areas = obtener_areas(texto_blockquote)
+                                                                sectores = obtener_sectores(texto_blockquote)
+                                                                nombres_integrantes_str = obtener_integrantes(texto_blockquote,  indice_comilla1)
+                                                                nombres_integrantes_lista = nombres_integrantes_str.split(',')
+                                                                
+                                                                publicacion_existente = next((a for a in publicaciones if a[0] == titulo_publicacion), None)
+                                                                                                                              
+                                                                if publicacion_existente is not None:
+                                                                    if isinstance(publicacion_existente[1], list):
+                                                                        publicacion_existente[1].extend([nombre for nombre in nombres_integrantes_lista if nombre.strip() and nombre.strip() not in publicacion_existente[1]])
+                                                                    else:
+                                                                        # Si publicacion_existente[1] no es una lista, puedes crear una nueva lista con los nombres anteriores y los nuevos
+                                                                        publicacion_existente = list(publicacion_existente)
+                                                                        publicacion_existente[1] = publicacion_existente[1].split(', ') + [nombre for nombre in nombres_integrantes_lista if nombre.strip() and nombre.strip() not in publicacion_existente[1]]
+                                                                else:
+                                                                    # Si el artículo no está en la lista, agregarlo
+                                                                   publicaciones.append((titulo_publicacion, nombres_integrantes_str,  tipo_producto, tipo_publicacion, estado, pais, titulo_revista,nombre_libro, issn,isbn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores))
                                                                    
                                                 #Va a la siguinete publicacion               
                                                 fila_publicacion = fila_publicacion.find_next_sibling('tr')
@@ -487,9 +476,6 @@ def obtener_nombre_libro(texto_blockquote):
             return texto_despues_comillas
     
     return ""
-
-
-
 
 def obtener_editorial(texto_blockquote):
     indice_ed = texto_blockquote.find("ed:")
@@ -770,7 +756,7 @@ try:
                 data_json.append(grupo_data)
 
         # Insertar datos en MongoDB Atlas
-        """
+        """""
         try:
             result = collection.insert_many(data_json)
             print(f"Se insertaron {len(result.inserted_ids)} documentos en MongoDB Atlas")
@@ -778,8 +764,8 @@ try:
             print(f"Error al insertar documentos en MongoDB Atlas: {e}")
 
         print("Resultados almacenados en", archivo_salida_csv, "y en MongoDB Atlas")
-        """
-
+        
+        """""
         """""
         #  actualizacion 
 
@@ -887,7 +873,7 @@ try:
 except requests.exceptions.ConnectionError as e:
     print("Error de conexión:", e)
 
-"""
+"""""
 finally:
     client.close()
-"""
+"""""
