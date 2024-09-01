@@ -41,10 +41,10 @@ archivo_salida_json = 'resultados_grupos_json.json'
 archivo_salida_csv = 'resultados_grupos_csv.csv'
 
 #Conexion con mongodb
-"""""
+
 MONGO_URI = "mongodb+srv://juanitasanabria:XwFAqnuDWYryhzab@cvlacdb.tbchf.mongodb.net/"
 
-
+"""""
 try:
     client = MongoClient(MONGO_URI)
     db = client.cvlacdb  # Nombre de la base de datos
@@ -234,10 +234,26 @@ def procesar_grupo(fila):
                                                        
                                                         indice_comilla1 = texto_blockquote.find('"')
                                                         if indice_comilla1 != -1:
-                                                            indice_comilla2 = texto_blockquote.find('"', indice_comilla1 + 1)
+                                                            indice_comilla2 = texto_blockquote.find('" .', indice_comilla1 + 1)
                                                             #Obtener titulo de la publicación
                                                             if indice_comilla2 != -1:
                                                                 titulo_publicacion = texto_blockquote[indice_comilla1 + 1:indice_comilla2]
+                                                                if titulo_publicacion == '':
+                                                                    publicacion_comillas_dobles1 = texto_blockquote.find('""')
+                                                                    
+                                                                    if publicacion_comillas_dobles1 != -1:
+                                                                       publicacion_comillas_dobles2 =  texto_blockquote.find('" .', publicacion_comillas_dobles1 + 3)
+                                                                       if publicacion_comillas_dobles2 != -1:
+                                                                        titulo_publicacion = texto_blockquote[publicacion_comillas_dobles1 + 1:publicacion_comillas_dobles2]
+                                                                        titulo_publicacion = titulo_publicacion.strip('"')
+                                                                    
+                                                                    publicacion_comillas_dobles_separadas1 = texto_blockquote.find('" "')
+                                                                    if publicacion_comillas_dobles_separadas1 != -1:
+                                                                       publicacion_comillas_dobles_separadas2 =  texto_blockquote.find('" .', publicacion_comillas_dobles_separadas1 + 2)
+                                                                       if publicacion_comillas_dobles2 != -1:
+                                                                        titulo_publicacion = texto_blockquote[publicacion_comillas_dobles_separadas1 + 1:publicacion_comillas_dobles_separadas2]
+                                                                        titulo_publicacion = titulo_publicacion.strip('"')
+                                                                        
                                                                 tipo_publicacion = tipo_publicacion.title()
                                                                 
                                                                 indice_pais = texto_blockquote.find("En:")
@@ -757,6 +773,7 @@ try:
 
         # Insertar datos en MongoDB Atlas
         """""
+       
         try:
             result = collection.insert_many(data_json)
             print(f"Se insertaron {len(result.inserted_ids)} documentos en MongoDB Atlas")
@@ -764,8 +781,9 @@ try:
             print(f"Error al insertar documentos en MongoDB Atlas: {e}")
 
         print("Resultados almacenados en", archivo_salida_csv, "y en MongoDB Atlas")
-        
         """""
+        
+       
         """""
         #  actualizacion 
 
