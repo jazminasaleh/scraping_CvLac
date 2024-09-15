@@ -34,7 +34,7 @@ os.environ['http_proxy'] = ''
 os.environ['https_proxy'] = ''
 
 # URL del GrupLac, se toman los 152 grupos
-url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=152'
+url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=1'
 
 # Los resultados se van a almacenar en un csv con nombre resultados_grupos
 archivo_salida_json = 'resultados_grupos_json.json'
@@ -68,8 +68,13 @@ paises_espanol = cargar_paises_espanol()
 def procesar_grupo(fila):
     ano_mes_fromacion_grupo  = ""
     ciudad_grupo = ""
+    paginaweb_grupo = ""
+    email_grupo = ""
     clasificacion_grupo = ""
     areas_grupo = ""
+    programacion_grupo = ""
+    programacion_secundaria_grupo = "" 
+
     columnas = fila.find_all('td')
 
     # Verificar si hay mas de tres columnas en la fila
@@ -107,8 +112,12 @@ def procesar_grupo(fila):
                 tables = soup_grupo.find_all('table')
                 ano_mes_fromacion_grupo  = ""
                 ciudad_grupo = ""
+                paginaweb_grupo = ""
+                email_grupo = ""
                 clasificacion_grupo = ""
                 areas_grupo = ""
+                programacion_grupo = ""
+                programacion_secundaria_grupo = "" 
                 for table in tables:
                     primer_tr = table.find('tr')
                     primer_td = primer_tr.find('td')
@@ -132,6 +141,16 @@ def procesar_grupo(fila):
                                             ciudad_grupo = ciudad_grupo.split("-")[1].strip()
                                     else:
                                         ciudad_grupo = ""
+                                elif etiqueta == "Página web":
+                                    if valor:
+                                        paginaweb_grupo = valor
+                                    else:
+                                        paginaweb_grupo = ""
+                                elif etiqueta == "E-mail":
+                                    if valor: 
+                                        email_grupo = valor
+                                    else:
+                                        email_grupo = ""
                                 elif etiqueta == "Clasificación":
                                     if valor:
                                         clasificacion_grupo = valor[0]
@@ -142,6 +161,16 @@ def procesar_grupo(fila):
                                         areas_grupo = valor.split(" -- ")[0]
                                     else:
                                         areas_grupo = ""
+                                elif etiqueta == "Programa nacional de ciencia y tecnología":
+                                    if valor:
+                                        programacion_grupo = valor
+                                    else:
+                                        programacion_grupo = ""
+                                elif etiqueta == "Programa nacional de ciencia y tecnología (secundario)":
+                                    if valor:
+                                        programacion_secundaria_grupo = valor
+                                    else:
+                                        programacion_secundaria_grupo = ""
 
                     if primer_td and primer_td.text.strip() == "Integrantes del grupo":
                         filas_tabla = table.find_all('tr')[2:]
@@ -441,7 +470,7 @@ def procesar_grupo(fila):
                 integrantes = []
 
             # Devolver los datos del grupo y sus integrantes
-            return [nombre_grupo, enlace_gruplac_grupo, ano_mes_fromacion_grupo, ciudad_grupo, clasificacion_grupo, areas_grupo, nombre_lider, cvlac_lider, integrantes]
+            return [nombre_grupo, enlace_gruplac_grupo, ano_mes_fromacion_grupo, ciudad_grupo, paginaweb_grupo, clasificacion_grupo, email_grupo, areas_grupo, programacion_grupo, programacion_secundaria_grupo, nombre_lider, cvlac_lider, integrantes]
 
     return []
 
@@ -705,7 +734,7 @@ try:
         data_json = []
 
         # El nombre de las columnas en el CSV
-        writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Fecha de formcación', 'Departamento - ciudad', 'Clasificación', 'Área de conocimiento', 'Nombre del líder', 'Enlace al CvLac líder',
+        writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Fecha de formcación', 'Ciudad', 'Página web', 'E-mail', 'Clasificación', 'Área de conocimiento', 'Programa nacional', 'Programa nacional(secundario)','Nombre del líder', 'Enlace al CvLac líder',
                          'Nombre del integrante', 'Enlace al CvLac del investigador', 'Nombre en citaciones',
                          'Nacionalidad', 'Sexo', 'Categoría', 'Título publicación', 'Integrantes involucrados',
                          'Tipo producto', 'Tipo publicación', 'Estado', 'País', 'Titulo revista', 'Nombre Libro','ISSN','ISBN',
@@ -719,14 +748,18 @@ try:
 
         for datos in resultados:
             if datos:
-                grupo, enlace_grupo,  ano, ciudad, clasificacion, areas_grupo, lider, cvlac_lider, integrantes = datos
+                grupo, enlace_grupo,  ano, ciudad, pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario,  lider, cvlac_lider, integrantes = datos
                 grupo_data = {
                     'Nombre del grupo': grupo,
                     'Enlace al GrupLac': enlace_grupo,
                     'Fecha de formcación': ano, 
-                    'Departamento - ciudad': ciudad,
+                    'Ciudad': ciudad,
+                    'Página web': pagina_web,
+                    'E-mail': email,
                     'Clasificación': clasificacion,
                     'Área de conocimiento': areas_grupo,
+                    'Programa nacional': programa,
+                    'Programa nacional(secundario)': programa_secundario,
                     'Nombre del líder': lider,
                     'Enlace al CvLac líder': cvlac_lider,
                     'Integrantes': []
@@ -767,7 +800,7 @@ try:
                                 'Sectores': sectores
                             }
                             integrante_data['Publicaciones'].append(publicacion_data)
-                            writer.writerow([grupo, enlace_grupo, ano, ciudad, clasificacion, areas_grupo, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista,nombre_libro,issn, isbn,editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores])
+                            writer.writerow([grupo, enlace_grupo, ano, ciudad, pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista,nombre_libro,issn, isbn,editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores])
                         grupo_data['Integrantes'].append(integrante_data)
                 data_json.append(grupo_data)
 
