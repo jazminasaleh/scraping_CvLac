@@ -90,7 +90,7 @@ def procesar_grupo(fila):
             nombre_grupo = enlace_grupo.text.strip()
             href_enlace = enlace_grupo.get('href')
             numero_url = href_enlace.split('=')[-1]
-            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro=00000000004994'
+            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro={numero_url}'
             # Obtener el nombre del líder y el enlace a su CvLac
             nombre_lider = columnas[3].text.strip()
 
@@ -176,18 +176,26 @@ def procesar_grupo(fila):
                                         programacion_secundaria_grupo = ""
                     if primer_td and primer_td.text.strip() == "Instituciones":
                         filas = table.find_all('tr')
-                        instituciones = []
+                        instituciones_avaladas = []
+                        instituciones_no_avaladas = []
                         for fila in filas[1:]:  # Empezamos desde la segunda fila para omitir el encabezado
                             celdas = fila.find_all('td')
                             if len(celdas) > 0:
                                 institucion = celdas[0].text.strip()
                                 institucion_limpia = re.sub(r'^\d+\.-?\s*', '', institucion)
            
-                                if institucion_limpia:
-                                    instituciones.append(institucion_limpia)
-                        
+                                # Usar una expresión regular para detectar si está "Avalado" o "No Avalado"
+                                if re.search(r'\(Avalado\)', institucion, re.IGNORECASE):
+                                    institucion_limpia = re.sub(r'\s*-\s*\(Avalado\)', '', institucion_limpia).strip()
+                                    instituciones_avaladas.append(institucion_limpia)
+                                elif re.search(r'\(No Avalado\)', institucion, re.IGNORECASE):
+                                    institucion_limpia = re.sub(r'\s*-\s*\(No Avalado\)', '', institucion_limpia).strip()
+                                    instituciones_no_avaladas.append(institucion_limpia)
+                                    
+                                            
                         # Unir todas las líneas en una sola cadena, separadas por comas
-                        instituciones_str = ", ".join(instituciones)
+                        instituciones_avaladas_str = ", ".join(instituciones_avaladas)
+                        instituciones_no_avaladas_str = ", ".join(instituciones_no_avaladas)
 
                     if primer_td and primer_td.text.strip() == "Líneas de investigación declaradas por el grupo":
                         filas = table.find_all('tr')
@@ -524,7 +532,7 @@ def procesar_grupo(fila):
                 integrantes = []
 
             # Devolver los datos del grupo y sus integrantes
-            return [nombre_grupo, enlace_gruplac_grupo, ano_mes_formacion_grupo, ciudad_grupo, paginaweb_grupo, email_grupo, clasificacion_grupo, areas_grupo, programacion_grupo, programacion_secundaria_grupo, instituciones_str, lineas_investigacion_str, nombre_lider, cvlac_lider, integrantes]
+            return [nombre_grupo, enlace_gruplac_grupo, ano_mes_formacion_grupo, ciudad_grupo, paginaweb_grupo, email_grupo, clasificacion_grupo, areas_grupo, programacion_grupo, programacion_secundaria_grupo, instituciones_avaladas_str,  instituciones_no_avaladas_str, lineas_investigacion_str, nombre_lider, cvlac_lider, integrantes]
 
     return []
 
@@ -789,7 +797,7 @@ try:
         data_json = []
 
         # El nombre de las columnas en el CSV
-        writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Fecha de formcación', 'Ciudad',  'Página web', 'E-mail', 'Clasificación', 'Área de conocimiento','Programa nacional', 'Programa nacional(secundario)', 'Instituciones',  'Líneas de investigación',  'Nombre del líder', 'Enlace al CvLac líder',
+        writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Fecha de formcación', 'Ciudad',  'Página web', 'E-mail', 'Clasificación', 'Área de conocimiento','Programa nacional', 'Programa nacional(secundario)', 'Instituciones avaladas','Instituciones no avaladas',  'Líneas de investigación',  'Nombre del líder', 'Enlace al CvLac líder',
                          'Nombre del integrante', 'Enlace al CvLac del investigador', 'Nombre en citaciones',
                          'Nacionalidad', 'Sexo', 'Categoría', 'Título publicación', 'Integrantes involucrados',
                          'Tipo producto', 'Tipo publicación', 'Estado', 'País', 'Titulo revista', 'Nombre Libro','ISSN','ISBN',
@@ -803,7 +811,7 @@ try:
 
         for datos in resultados:
             if datos:
-                grupo, enlace_grupo,  ano, ciudad,  pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario, instituciones_str, lineas_investigacion_str, lider, cvlac_lider, integrantes = datos
+                grupo, enlace_grupo,  ano, ciudad,  pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario,  instituciones_avaladas_str, instituciones_no_avaladas_str, lineas_investigacion_str, lider, cvlac_lider, integrantes = datos
                 grupo_data = {
                     'Nombre del grupo': grupo,
                     'Enlace al GrupLac': enlace_grupo,
@@ -815,7 +823,8 @@ try:
                     'Área de conocimiento': areas_grupo,
                     'Programa nacional': programa,
                     'Programa nacional(secundario)': programa_secundario,
-                    'Instituciones': instituciones_str,
+                    'Instituciones avaladas': instituciones_avaladas_str,
+                    'Instituciones no avaladas': instituciones_no_avaladas_str,
                     'Líneas de investigación': lineas_investigacion_str,
                     'Nombre del líder': lider,
                     'Enlace al CvLac líder': cvlac_lider,
@@ -857,7 +866,7 @@ try:
                                 'Sectores': sectores
                             }
                             integrante_data['Publicaciones'].append(publicacion_data)
-                            writer.writerow([grupo, enlace_grupo, ano, ciudad, pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario, instituciones_str, lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista,nombre_libro,issn, isbn,editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores])
+                            writer.writerow([grupo, enlace_grupo, ano, ciudad, pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario, instituciones_avaladas_str, instituciones_no_avaladas_str, lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista,nombre_libro,issn, isbn,editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores])
                         grupo_data['Integrantes'].append(integrante_data)
                 data_json.append(grupo_data)
 
