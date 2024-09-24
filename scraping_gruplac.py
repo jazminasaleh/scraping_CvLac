@@ -34,17 +34,17 @@ os.environ['http_proxy'] = ''
 os.environ['https_proxy'] = ''
 
 # URL del GrupLac, se toman los 152 grupos
-url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=4'
+url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=1'
 
 # Los resultados se van a almacenar en un csv con nombre resultados_grupos
 archivo_salida_json = 'resultados_grupos_json.json'
 archivo_salida_csv = 'resultados_grupos_csv.csv'
 
 #Conexion con mongodb
-
+"""""
 MONGO_URI = "mongodb+srv://juanitasanabria:XwFAqnuDWYryhzab@cvlacdb.tbchf.mongodb.net/"
 
-"""""
+
 try:
     client = MongoClient(MONGO_URI)
     db = client.cvlacdb  # Nombre de la base de datos
@@ -76,7 +76,6 @@ def procesar_grupo(fila):
     programacion_secundaria_grupo = "" 
     instituciones_str = ""
     lineas_investigacion_str = ""
-
     columnas = fila.find_all('td')
 
     # Verificar si hay mas de tres columnas en la fila
@@ -175,7 +174,6 @@ def procesar_grupo(fila):
                                         programacion_secundaria_grupo = valor
                                     else:
                                         programacion_secundaria_grupo = ""
-
                     if primer_td and primer_td.text.strip() == "Instituciones":
                         filas = table.find_all('tr')
                         instituciones = []
@@ -207,28 +205,15 @@ def procesar_grupo(fila):
 
                     if primer_td and primer_td.text.strip() == "Integrantes del grupo":
                         filas_tabla = table.find_all('tr')[2:]
-                        vinculacion = ""
-                        horas_dedicacion = ""
-                        inicio_fin_vinculacion = ""
+                        
                         # Obtener nombre de cada investigador, enlace de su CvLac
                         for tercer_tr in filas_tabla:
                             enlaces_integrantes = tercer_tr.find_all('a')
                             for enlace_integrante in enlaces_integrantes:
                                 nombre_integrante = enlace_integrante.text.strip()
                                 #Solo deja la primera letra en mayuscula
-                                nombre_integrante = nombre_integrante.title() 
+                                nombre_integrante = nombre_integrante.title()
                                 enlace_cvlac_integrante = enlace_integrante.get('href')
-                                vinculacion = ""
-                                horas_dedicacion = ""
-                                inicio_fin_vinculacion = ""
-                                # Obtener datos adicionales
-                                celdas = tercer_tr.find_all('td')
-                                if len(celdas) >= 2:  # Asegurarse de que hay al menos dos celdas
-                                    vinculacion = celdas[1].text.strip()
-                                    if len(celdas) >= 3:
-                                        horas_dedicacion = celdas[2].text.strip()
-                                    if len(celdas) >= 4:
-                                        inicio_fin_vinculacion = celdas[3].text.strip()
 
                                 try:
                                     response_cvlac_integrante = session.get(enlace_cvlac_integrante)
@@ -309,7 +294,7 @@ def procesar_grupo(fila):
                                                        
                                                         indice_comilla1 = texto_blockquote.find('"')
                                                         if indice_comilla1 != -1:
-                                                            indice_comilla2 = texto_blockquote.find('" .', indice_comilla1 + 1)
+                                                            indice_comilla2 = texto_blockquote.find('"', indice_comilla1 + 1)
                                                             #Obtener titulo de la publicación
                                                             if indice_comilla2 != -1:
                                                                 titulo_publicacion = texto_blockquote[indice_comilla1 + 1:indice_comilla2]
@@ -318,17 +303,40 @@ def procesar_grupo(fila):
                                                                     
                                                                     if publicacion_comillas_dobles1 != -1:
                                                                        publicacion_comillas_dobles2 =  texto_blockquote.find('" .', publicacion_comillas_dobles1 + 3)
+                                                                       publicacion_comillas_dobles2_secundario =  texto_blockquote.find('." En:', publicacion_comillas_dobles1 + 3)
+                                                                       publicacion_comillas_dobles2_tercero =  texto_blockquote.find('""', publicacion_comillas_dobles1 + 3)
+                                                                       publicacion_comillas_dobles2_cuarto =  texto_blockquote.find('"', publicacion_comillas_dobles1 + 3)
                                                                        if publicacion_comillas_dobles2 != -1:
                                                                         titulo_publicacion = texto_blockquote[publicacion_comillas_dobles1 + 1:publicacion_comillas_dobles2]
                                                                         titulo_publicacion = titulo_publicacion.strip('"')
-                                                                    
+                                                                       elif publicacion_comillas_dobles2_secundario != -1:
+                                                                            titulo_publicacion = texto_blockquote[publicacion_comillas_dobles1 + 1:publicacion_comillas_dobles2_secundario]
+                                                                            titulo_publicacion = titulo_publicacion.strip('"')
+                                                                       elif publicacion_comillas_dobles2_tercero != -1:
+                                                                            titulo_publicacion = texto_blockquote[publicacion_comillas_dobles1 + 1:publicacion_comillas_dobles2_tercero]
+                                                                            titulo_publicacion = titulo_publicacion.strip('"')
+                                                                       elif publicacion_comillas_dobles2_cuarto != -1:
+                                                                            titulo_publicacion = texto_blockquote[publicacion_comillas_dobles1 + 1:publicacion_comillas_dobles2_cuarto]
+                                                                            titulo_publicacion = titulo_publicacion.strip('"')
                                                                     publicacion_comillas_dobles_separadas1 = texto_blockquote.find('" "')
                                                                     if publicacion_comillas_dobles_separadas1 != -1:
                                                                        publicacion_comillas_dobles_separadas2 =  texto_blockquote.find('" .', publicacion_comillas_dobles_separadas1 + 2)
+                                                                       publicacion_comillas_dobles_separadas2_segundas =  texto_blockquote.find('""', publicacion_comillas_dobles_separadas1 + 2)
+                                                                       publicacion_comillas_dobles_separadas2_terceras =  texto_blockquote.find('. En:', publicacion_comillas_dobles_separadas1 + 3)
+                                                                       publicacion_comillas_dobles_separadas2_cuartas =  texto_blockquote.find('"" . En:', publicacion_comillas_dobles_separadas1 + 3)
                                                                        if publicacion_comillas_dobles2 != -1:
                                                                         titulo_publicacion = texto_blockquote[publicacion_comillas_dobles_separadas1 + 1:publicacion_comillas_dobles_separadas2]
                                                                         titulo_publicacion = titulo_publicacion.strip('"')
-                                                                        
+                                                                       elif publicacion_comillas_dobles_separadas2_segundas != -1:
+                                                                        titulo_publicacion = texto_blockquote[publicacion_comillas_dobles_separadas1 + 1:publicacion_comillas_dobles_separadas2_segundas]
+                                                                        titulo_publicacion = titulo_publicacion.strip('"')
+                                                                       elif publicacion_comillas_dobles_separadas2_terceras != -1:
+                                                                        titulo_publicacion = texto_blockquote[publicacion_comillas_dobles_separadas1 + 1:publicacion_comillas_dobles_separadas2_terceras]
+                                                                        titulo_publicacion = titulo_publicacion.strip('"')
+                                                                       elif publicacion_comillas_dobles_separadas2_cuartas != -1:
+                                                                        titulo_publicacion = texto_blockquote[publicacion_comillas_dobles_separadas1 + 1:publicacion_comillas_dobles_separadas2_cuartas]
+                                                                        titulo_publicacion = titulo_publicacion.strip('"')
+                                                                    
                                                                 tipo_publicacion = tipo_publicacion.title()
                                                                 
                                                                 indice_pais = texto_blockquote.find("En:")
@@ -505,11 +513,11 @@ def procesar_grupo(fila):
                                                 fila_publicacion = fila_publicacion.find_next_sibling('tr')
                                                
                                     # Agregar los datos del integrante y sus artículos a la lista
-                                    integrantes.append([nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_fin_vinculacion, nombre_citaciones, nacionalidad, sexo, categoria,publicaciones])
+                                    integrantes.append([nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria,publicaciones])
 
                                 except requests.exceptions.RequestException:
                                     # En caso de error en la solicitud HTTP
-                                    integrantes.append(['', '', '', '', '', '', '', '', '', []])
+                                    integrantes.append(['', '', '', '', '', []])
 
             except requests.exceptions.RequestException:
                 # En caso de error en la solicitud HTTP
@@ -780,8 +788,8 @@ try:
         data_json = []
 
         # El nombre de las columnas en el CSV
-        writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Fecha de formcación', 'Ciudad', 'Página web', 'E-mail', 'Clasificación', 'Área de conocimiento', 'Programa nacional', 'Programa nacional(secundario)', 'Instituciones',  'Líneas de investigación', 'Nombre del líder','Enlace al CvLac líder',
-                         'Nombre del integrante', 'Enlace al CvLac del investigador','Vinculación', 'Horas dedicación', 'Inicio - Fin Vinculación', 'Nombre en citaciones',
+        writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Fecha de formcación', 'Ciudad',  'Página web', 'E-mail', 'Clasificación', 'Área de conocimiento','Programa nacional', 'Programa nacional(secundario)', 'Instituciones',  'Líneas de investigación',  'Nombre del líder', 'Enlace al CvLac líder',
+                         'Nombre del integrante', 'Enlace al CvLac del investigador', 'Nombre en citaciones',
                          'Nacionalidad', 'Sexo', 'Categoría', 'Título publicación', 'Integrantes involucrados',
                          'Tipo producto', 'Tipo publicación', 'Estado', 'País', 'Titulo revista', 'Nombre Libro','ISSN','ISBN',
                          'Editorial', 'Volumen', 'Fascículo', 'Páginas', 'Año publicación', 'DOI', 'Palabras clave',
@@ -794,12 +802,12 @@ try:
 
         for datos in resultados:
             if datos:
-                grupo, enlace_grupo,  ano, ciudad, pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario, instituciones_str, lineas_investigacion_str, lider, cvlac_lider, integrantes = datos
+                grupo, enlace_grupo,  ano, ciudad,  pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario, instituciones_str, lineas_investigacion_str, lider, cvlac_lider, integrantes = datos
                 grupo_data = {
                     'Nombre del grupo': grupo,
                     'Enlace al GrupLac': enlace_grupo,
                     'Fecha de formcación': ano, 
-                    'Ciudad': ciudad,
+                    'Departamento - ciudad': ciudad,
                     'Página web': pagina_web,
                     'E-mail': email,
                     'Clasificación': clasificacion,
@@ -813,14 +821,11 @@ try:
                     'Integrantes': []
                 }
                 for integrante in integrantes:
-                    if len(integrante) == 10:
-                        nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_fin_vinculacion, nombre_citaciones, nacionalidad, sexo, categoria, publicaciones = integrante
+                    if len(integrante) == 7:
+                        nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, publicaciones = integrante
                         integrante_data = {
                             'Nombre del integrante': nombre_integrante,
                             'Enlace al CvLac del investigador': enlace_cvlac_integrante,
-                            'Vinculación':vinculacion, 
-                            'Horas dedicación':horas_dedicacion, 
-                            'Inicio - Fin Vinculación':inicio_fin_vinculacion,
                             'Nombre en citaciones': nombre_citaciones,
                             'Nacionalidad': nacionalidad,
                             'Sexo': sexo,
@@ -851,13 +856,12 @@ try:
                                 'Sectores': sectores
                             }
                             integrante_data['Publicaciones'].append(publicacion_data)
-                            writer.writerow([grupo, enlace_grupo, ano, ciudad, pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario, instituciones_str, lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_fin_vinculacion, nombre_citaciones, nacionalidad, sexo, categoria, titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista,nombre_libro,issn, isbn,editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores])
+                            writer.writerow([grupo, enlace_grupo, ano, ciudad, pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario, instituciones_str, lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista,nombre_libro,issn, isbn,editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores])
                         grupo_data['Integrantes'].append(integrante_data)
                 data_json.append(grupo_data)
 
         # Insertar datos en MongoDB Atlas
         """""
-       
         try:
             result = collection.insert_many(data_json)
             print(f"Se insertaron {len(result.inserted_ids)} documentos en MongoDB Atlas")
@@ -865,9 +869,8 @@ try:
             print(f"Error al insertar documentos en MongoDB Atlas: {e}")
 
         print("Resultados almacenados en", archivo_salida_csv, "y en MongoDB Atlas")
-        """""
         
-       
+        """""
         """""
         #  actualizacion 
 
