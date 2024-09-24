@@ -90,7 +90,7 @@ def procesar_grupo(fila):
             nombre_grupo = enlace_grupo.text.strip()
             href_enlace = enlace_grupo.get('href')
             numero_url = href_enlace.split('=')[-1]
-            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro={numero_url}'
+            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro=00000000004994'
             # Obtener el nombre del líder y el enlace a su CvLac
             nombre_lider = columnas[3].text.strip()
 
@@ -628,7 +628,7 @@ def obtener_fasciculo(texto_blockquote):
             fasciculo = texto_blockquote[indice_fasc + len("fasc."):indice_p].strip()
         else:
             fasciculo = texto_blockquote[indice_fasc + len("fasc."):].strip()
-        return "" if fasciculo.isdigit() and len(fasciculo) == 4 else fasciculo
+        return "" if fasciculo in ["N/A", "NA", "N7A", "-", "--", "(N/A)", "(N/A"] or (fasciculo.isdigit() and len(fasciculo) == 4) else fasciculo
     return ""
 
 # Obtener el número de pagina
@@ -696,13 +696,14 @@ def obtener_doi(texto_blockquote):
         indice_sectores = texto_blockquote.find("Sectores:", indice_doi)
         indice_doi_dos = texto_blockquote.find("doi:", indice_doi)
         if indice_palabras != -1:
-            return texto_blockquote[indice_doi + len("DOI:"):indice_palabras].strip()
+            doi = texto_blockquote[indice_doi + len("DOI:"):indice_palabras].strip()
         elif indice_sectores != -1:
-            return texto_blockquote[indice_doi + len("DOI:"):indice_sectores].strip()
+            doi = texto_blockquote[indice_doi + len("DOI:"):indice_sectores].strip()
         elif indice_doi_dos != -1:
-            return texto_blockquote[indice_doi_dos + len("doi:"):].strip()
+            doi = texto_blockquote[indice_doi_dos + len("doi:"):].strip()
         else:
-            return texto_blockquote[indice_doi + len("DOI:"):].strip()
+            doi = texto_blockquote[indice_doi + len("DOI:"):].strip()
+        return "" if doi == "N/A" else doi
     return ""
 
 # Obtener palabras claves de la publicación
