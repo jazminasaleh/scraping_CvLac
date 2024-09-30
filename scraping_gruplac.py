@@ -63,7 +63,26 @@ def cargar_paises_espanol():
     return paises
 
 paises_espanol = cargar_paises_espanol()
+def cargar_meses():
+    meses = {}
+    with open('meses.csv', mode='r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            meses[row['mes']] = row['numero']  
+    return meses
+meses=cargar_meses()
 
+def formatear_fecha(fecha_texto,meses):
+    partes = fecha_texto.split("de")
+    if len(partes) == 2:  
+        mes = partes[0].strip()  
+        anio = partes[1].strip()  
+        mes_num = meses.get(mes, "01") 
+        return f"01/{mes_num}/{anio}"
+    elif len(partes) == 1:  
+        anio = partes[0].strip()
+        return f"01/01/{anio}"  
+    return None
 # Función para extrear la informcaión de los grupos y sus investigadores
 def procesar_grupo(fila):
     ano_mes_formacion_grupo  = ""
@@ -74,7 +93,8 @@ def procesar_grupo(fila):
     areas_grupo = ""
     programacion_grupo = ""
     programacion_secundaria_grupo = "" 
-    instituciones_str = ""
+    instituciones_avaladas_str = ""
+    instituciones_no_avaladas_str=""
     lineas_investigacion_str = ""
     columnas = fila.find_all('td')
 
@@ -192,7 +212,7 @@ def procesar_grupo(fila):
                                     institucion_limpia = re.sub(r'\s*-\s*\(No Avalado\)', '', institucion_limpia).strip()
                                     instituciones_no_avaladas.append(institucion_limpia)
                                     
-                                            
+                                           
                         # Unir todas las líneas en una sola cadena, separadas por comas
                         instituciones_avaladas_str = ", ".join(instituciones_avaladas)
                         instituciones_no_avaladas_str = ", ".join(instituciones_no_avaladas)
@@ -234,6 +254,8 @@ def procesar_grupo(fila):
                                     categoria = ''
                                     nacionalidad = ''
                                     sexo = ''
+                                    area_actuacion=''
+                                    formacion_academica=[]
                                     publicaciones= []
 
                                     # Obtener nombre de cada investigador en citaciones, nacionalidad, sexo y categoría
@@ -260,20 +282,69 @@ def procesar_grupo(fila):
                                                 categoria = categoria[:ultimo_paren + 1].strip()
                                         if categoria == '':
                                             categoria = 'Sin categoría'
+                                        #Sección Formación académica
+                                        seccion_formacion=table_cvlac.find('h3',string=['Formación Académica'])
+                                        if seccion_formacion:
+                                            fila_formacion=seccion_formacion.find_parent('tr').find_next_sibling('tr')
 
+                                            while fila_formacion:
+                                                celdas_formacion=fila_formacion.find_all('td')
+
+                                                if len(celdas_formacion)>1:
+                                                    tipo_formacion=celdas_formacion[1].find('b').text.strip()
+                                                    contenido= celdas_formacion[1].get_text(separator="|").strip().split("|")
+                                                    institucion=contenido[1].strip() if len(contenido) > 1 else None
+                                                    titulo_formacion = contenido[2].strip() if len(contenido) > 2 else None
+                                                    inicio_formacion = contenido[3].strip() if len(contenido) > 3 else None
+                                                    trabajo_grado = contenido[4].strip() if len(contenido) > 4 else None
+
+                                                    if inicio_formacion:
+                                                        fechas_formacion=inicio_formacion.split("-")
+                                                        inicio_formacion=formatear_fecha(fechas_formacion[0].strip(),meses) if len(fechas_formacion) > 0 else None
+                                                        fin_formacion= formatear_fecha(fechas_formacion[1].strip(),meses) if len(fechas_formacion) > 1 else None 
+                                                    if (tipo_formacion, institucion,titulo_formacion,inicio_formacion,fin_formacion,trabajo_grado) not in formacion_academica:
+                                                        formacion_academica.append((tipo_formacion, institucion,titulo_formacion,inicio_formacion,fin_formacion,trabajo_grado))
+
+                                                fila_formacion=fila_formacion.find_next_sibling('tr')
+                                            print(formacion_academica)
+                                        #Sección Áreas de Actuación
+                                        seccion_area_actuacion=table_cvlac.find('h3',string=['Áreas de actuación'])
+                                        if seccion_area_actuacion:
+                                            
+                                            fila_area=seccion_area_actuacion.find_parent('tr').find_next_sibling('tr')
+                                            texto_unico = set()  
+                                            while fila_area:
+                                                celdas_area = fila_area.find_all('td')
+                                                for celda in celdas_area:
+                                                    texto_unico.update(celda.get_text(strip=True).split(' -- ')) 
+                                                fila_area = fila_area.find_next_sibling('tr')
+                                            area_actuacion = ','.join(sorted(texto_unico))  
+                                        # Sección Líneas de Investigación
+                                        seccion_lineas_investigacion = table_cvlac.find('h3', string=['Líneas de investigación'])
+                                        if seccion_lineas_investigacion:
+                                            fila_linea = seccion_lineas_investigacion.find_parent('tr').find_next_sibling('tr')
+
+                                            lineas_activas = []
+                                            lineas_no_activas = []
+
+                                            while fila_linea:
+                                                celdas_linea = fila_linea.find_all('td')
+                                                for celda in celdas_linea:
+                                                    texto_linea = celda.get_text(strip=True).rstrip(',')
+                                                    if "Activa:Si" in texto_linea:
+                                                        lineas_activas.append(texto_linea.replace("Activa:Si", "").strip().rstrip(','))
+                                                    elif "Activa:No" in texto_linea:
+                                                        lineas_no_activas.append(texto_linea.replace("Activa:No", "").strip().rstrip(','))
+                                                fila_linea = fila_linea.find_next_sibling('tr')
                                         # Buscar la sección de 'Artículos','Libros','Capitulos de libro', 'Textos en publicaciones no científicas'
                                         seccion_publicacion = table_cvlac.find('h3', string=['Artículos','Libros','Capitulos de libro', 'Textos en publicaciones no científicas'])
                                         if seccion_publicacion:
                                             tipo_producto = seccion_publicacion.text
                                             # Encontrar la fila (tr) siguiente después de la sección "Artículos"
                                             fila_publicacion = seccion_publicacion.find_parent('tr').find_next_sibling('tr')
-                                           
-                                            
                                             # Extraer los artículos de la segunda fila (tr)
                                             while fila_publicacion:
                                                 celdas_publicacion = fila_publicacion.find_all('td')
-                                               
-                                                
                                                 #Dentro de blockquote es donde se encuentra toda la informacion de las publicaciones 
                                                 if celdas_publicacion:
                                                     elementos_blockquote = celdas_publicacion[0].find('blockquote')
@@ -521,11 +592,11 @@ def procesar_grupo(fila):
                                                 fila_publicacion = fila_publicacion.find_next_sibling('tr')
                                                
                                     # Agregar los datos del integrante y sus artículos a la lista
-                                    integrantes.append([nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria,publicaciones])
+                                    integrantes.append([nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria,formacion_academica,area_actuacion,lineas_activas,lineas_no_activas,publicaciones])
 
                                 except requests.exceptions.RequestException:
                                     # En caso de error en la solicitud HTTP
-                                    integrantes.append(['', '', '', '', '', []])
+                                    integrantes.append(['', '', '', '', '', '',[],'',[],[],[]])
 
             except requests.exceptions.RequestException:
                 # En caso de error en la solicitud HTTP
@@ -799,7 +870,7 @@ try:
         # El nombre de las columnas en el CSV
         writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Fecha de formcación', 'Ciudad',  'Página web', 'E-mail', 'Clasificación', 'Área de conocimiento','Programa nacional', 'Programa nacional(secundario)', 'Instituciones avaladas','Instituciones no avaladas',  'Líneas de investigación',  'Nombre del líder', 'Enlace al CvLac líder',
                          'Nombre del integrante', 'Enlace al CvLac del investigador', 'Nombre en citaciones',
-                         'Nacionalidad', 'Sexo', 'Categoría', 'Título publicación', 'Integrantes involucrados',
+                         'Nacionalidad', 'Sexo', 'Categoría','Tipo de Formación','Institución','Título Formación','Inicio Formación','Fin Formación','Trabajo de Grado','Áreas de Actuación','Líneas Activas','Líneas no Activas','Título publicación', 'Integrantes involucrados',
                          'Tipo producto', 'Tipo publicación', 'Estado', 'País', 'Titulo revista', 'Nombre Libro','ISSN','ISBN',
                          'Editorial', 'Volumen', 'Fascículo', 'Páginas', 'Año publicación', 'DOI', 'Palabras clave',
                          'Areas', 'Sectores'])
@@ -831,8 +902,8 @@ try:
                     'Integrantes': []
                 }
                 for integrante in integrantes:
-                    if len(integrante) == 7:
-                        nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, publicaciones = integrante
+                    if len(integrante) == 11:
+                        nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria,formacion_academica,area_actuacion,lineas_activas,lineas_no_activas,publicaciones = integrante
                         integrante_data = {
                             'Nombre del integrante': nombre_integrante,
                             'Enlace al CvLac del investigador': enlace_cvlac_integrante,
@@ -840,8 +911,23 @@ try:
                             'Nacionalidad': nacionalidad,
                             'Sexo': sexo,
                             'Categoría': categoria,
+                            'Formación Académica':[],
+                            'Áreas de Actuación':area_actuacion,
+                            'Líneas Activas':lineas_activas,
+                            'Líneas no Activas':lineas_no_activas,
                             'Publicaciones': []
                         }
+                        for formacion in formacion_academica:
+                            tipo_formacion,institucion,titulo_formacion,inicio_formacion,fin_formacion,trabajo_grado = formacion
+                            formacion_data = {
+                                'Tipo Formación': tipo_formacion,
+                                'Institucion': institucion,
+                                'Título Formacion':titulo_formacion,
+                                'Inicio Formación':inicio_formacion,
+                                'Fin Formación':fin_formacion,
+                                'Trabajo de Grado':trabajo_grado
+                            }
+                            writer.writerow([grupo, enlace_grupo, ano, ciudad, pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario, instituciones_avaladas_str, instituciones_no_avaladas_str, lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria,tipo_formacion,institucion,titulo_formacion,inicio_formacion,fin_formacion,trabajo_grado,area_actuacion,lineas_activas,lineas_no_activas,'','', '', '', '', '', '','','', '','', '', '', '', '', '', '', '', ''])
                         for publicacion in publicaciones:
                             titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista, nombre_libro,issn,isbn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores = publicacion
                             publicacion_data = {
@@ -865,8 +951,9 @@ try:
                                 'Areas': areas,
                                 'Sectores': sectores
                             }
+                            integrante_data['Formación Académica'].append(formacion_data)
                             integrante_data['Publicaciones'].append(publicacion_data)
-                            writer.writerow([grupo, enlace_grupo, ano, ciudad, pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario, instituciones_avaladas_str, instituciones_no_avaladas_str, lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista,nombre_libro,issn, isbn,editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores])
+                            writer.writerow([grupo, enlace_grupo, ano, ciudad, pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario, instituciones_avaladas_str, instituciones_no_avaladas_str, lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria,tipo_formacion,institucion,titulo_formacion,inicio_formacion,fin_formacion,trabajo_grado,area_actuacion,lineas_activas,lineas_no_activas,titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista,nombre_libro,issn, isbn,editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores])
                         grupo_data['Integrantes'].append(integrante_data)
                 data_json.append(grupo_data)
 
