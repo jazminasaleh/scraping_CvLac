@@ -110,7 +110,7 @@ def procesar_grupo(fila):
             nombre_grupo = enlace_grupo.text.strip()
             href_enlace = enlace_grupo.get('href')
             numero_url = href_enlace.split('=')[-1]
-            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro=00000000001981'
+            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro={numero_url}'
             # Obtener el nombre del líder y el enlace a su CvLac
             nombre_lider = columnas[3].text.strip()
 
@@ -258,6 +258,8 @@ def procesar_grupo(fila):
                                     formacion_academica=[]
                                     patentes=[]
                                     publicaciones= []
+                                    lineas_activas = []
+                                    lineas_no_activas = []
                                     
 
                                     # Obtener nombre de cada investigador en citaciones, nacionalidad, sexo y categoría
@@ -655,6 +657,7 @@ def procesar_grupo(fila):
                                                                 nombres_integrantes_str = obtener_integrantes(texto_blockquote,  indice_comilla1)
                                                                 nombres_integrantes_lista = nombres_integrantes_str.split(',')
                                                                 
+                                                                
                                                                 publicacion_existente = next((a for a in publicaciones if a[0] == titulo_publicacion), None)
                                                                                                                               
                                                                 if publicacion_existente is not None:
@@ -1032,6 +1035,7 @@ try:
                                 'Areas': areas,
                                 'Sectores': sectores
                             }
+                            writer.writerow([grupo, enlace_grupo, ano, ciudad, pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario, instituciones_avaladas_str, instituciones_no_avaladas_str, lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, nombre_citaciones, nacionalidad, sexo, categoria, '', '', '', '', '', '', area_actuacion, ', '.join(lineas_activas), ', '.join(lineas_no_activas), titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista, nombre_libro, issn, isbn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores] + [''] * 3)
                         for patente in patentes:
                             tipo_patente,estado_patente,codigo_patente,titulo_patente,institucion_patente,  via_solicitud_patente, pais_patente, fecha_patente, nombre_solicitante_patente, gaceta_publicacion_patente=patente
                             patente_data={
