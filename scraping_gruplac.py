@@ -189,10 +189,10 @@ def procesar_grupo(fila):
                                     if valor:
                                         clasificacion_grupo = valor[0]
                                     else:
-                                        clasificacion_grupo = ""
+                                        clasificacion_grupo = "Sin clasificar"
                                 elif etiqueta == "Área de conocimiento":
                                     if valor:
-                                        areas_grupo = valor.split(" -- ")[0]
+                                        areas_grupo = valor
                                     else:
                                         areas_grupo = ""
                                 elif etiqueta == "Programa nacional de ciencia y tecnología":
