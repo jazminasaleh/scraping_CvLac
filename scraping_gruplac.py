@@ -113,7 +113,7 @@ def procesar_grupo(fila):
             nombre_grupo = enlace_grupo.text.strip()
             href_enlace = enlace_grupo.get('href')
             numero_url = href_enlace.split('=')[-1]
-            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro=00000000000708'
+            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro={numero_url}'
             # Obtener el nombre del líder y el enlace a su CvLac
             nombre_lider = columnas[3].text.strip()
 
@@ -326,6 +326,14 @@ def procesar_grupo(fila):
                                                     contenido= celdas_formacion[1].get_text(separator="|").strip().split("|")
                                                     institucion=contenido[1].strip() if len(contenido) > 1 else None
                                                     titulo_formacion = contenido[2].strip() if len(contenido) > 2 else None
+                                                    if titulo_formacion:
+                                                        titulo_formacion = re.sub(r'^[\'"\[\]]+|[\'"\[\]]+$', '', titulo_formacion)  
+                                                        titulo_formacion = re.sub(r'[^\w\s\(\)]+', '', titulo_formacion)  
+                                                        titulo_formacion = re.sub(r'^\d+\s*', '', titulo_formacion)
+                                                        if titulo_formacion.isdigit():  
+                                                            titulo_formacion = ""
+                                                        else: 
+                                                            titulo_formacion = titulo_formacion.lower()
                                                     inicio_formacion = contenido[3].strip() if len(contenido) > 3 else None
                                                     trabajo_grado = contenido[4].strip() if len(contenido) > 4 else None
 
