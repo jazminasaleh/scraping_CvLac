@@ -113,7 +113,7 @@ def procesar_grupo(fila):
             nombre_grupo = enlace_grupo.text.strip()
             href_enlace = enlace_grupo.get('href')
             numero_url = href_enlace.split('=')[-1]
-            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro={numero_url}'
+            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro=00000000006350'
             # Obtener el nombre del líder y el enlace a su CvLac
             nombre_lider = columnas[3].text.strip()
 
@@ -179,7 +179,10 @@ def procesar_grupo(fila):
                                         ciudad_grupo = ""
                                 elif etiqueta == "Página web":
                                     if valor:
-                                        paginaweb_grupo = valor
+                                        if ("@uptc.edu.co" in valor) or (valor == "-") or (valor == "http:") or (valor == "http://") or (valor == "N/A") or (valor == "N.A."):
+                                            paginaweb_grupo = ""
+                                        else:
+                                            paginaweb_grupo = valor
                                     else:
                                         paginaweb_grupo = ""
                                 elif etiqueta == "E-mail":
@@ -445,7 +448,7 @@ def procesar_grupo(fila):
                                                                                             if siguiente_texto:
                                                                                                 gaceta_publicacion_patente = siguiente_texto.strip().split(',')[0]  
                                                                                                 
-                                                                                        print(nombre_solicitante_patente)
+                                                                                        
                                                                                         # Identificar la fecha de la patente (YYYY-MM-DD)
                                                                                         if re.search(r'\d{4}-\d{2}-\d{2}', siguiente_texto):
                                                                                             fecha_patente = re.search(r'\d{4}-\d{2}-\d{2}', siguiente_texto).group(0)
@@ -618,6 +621,8 @@ def procesar_grupo(fila):
 
                                                                             if len(texto_despues_pais) > 1:
                                                                                 titulo_revista = texto_despues_pais.replace(pais, "").strip()
+                                                                                if titulo_revista.startswith("."):
+                                                                                    titulo_revista = titulo_revista[1:].strip()  # Eliminar el punto inicial
                                                                                 if "revista" in titulo_revista.lower():
                                                                                     indice_revista = titulo_revista.lower().find("revista")
                                                                                     titulo_revista = titulo_revista[indice_revista:].strip()
@@ -641,6 +646,9 @@ def procesar_grupo(fila):
                                                                         indice_issn = texto_blockquote.find("ISSN:") -1
                                                                         if indice_issn != -1:
                                                                             titulo_revista = texto_blockquote[indice_final_pais:indice_issn].strip()
+                                                                             # Verificar si el título de la revista inicia con '. En: '
+                                                                            if titulo_revista.startswith('." En: .'):
+                                                                                titulo_revista = titulo_revista[14:].strip()  # Omitir los primeros 5 caracteres
                                                                         else:
                                                                             titulo_revista = ""
                                                                     elif tipo_producto == "Capitulos de libro":
@@ -743,17 +751,26 @@ def obtener_issn(texto_blockquote):
     if indice_issn != -1:
         indice_ed = texto_blockquote.find("ed", indice_issn)
         indice_p = texto_blockquote.find("p.", indice_issn)
+        
+        # Extraer el ISSN dependiendo de los índices encontrados
         if indice_ed != -1 and indice_p != -1:
             if indice_ed < indice_p:
-                return texto_blockquote[indice_issn + len("ISSN:"):indice_ed].strip()
+                issn = texto_blockquote[indice_issn + len("ISSN:"):indice_ed].strip()
             else:
-                return texto_blockquote[indice_issn + len("ISSN:"):indice_p].strip()
+                issn = texto_blockquote[indice_issn + len("ISSN:"):indice_p].strip()
         elif indice_ed != -1:
-            return texto_blockquote[indice_issn + len("ISSN:"):indice_ed].strip()
+            issn = texto_blockquote[indice_issn + len("ISSN:"):indice_ed].strip()
         elif indice_p != -1:
-            return texto_blockquote[indice_issn + len("ISSN:"):indice_p].strip()
+            issn = texto_blockquote[indice_issn + len("ISSN:"):indice_p].strip()
         else:
-            return texto_blockquote[indice_issn + len("ISSN:"):].strip()   
+            issn = texto_blockquote[indice_issn + len("ISSN:"):].strip()
+        
+        # Validar si el ISSN cumple con el formato ####-####
+        if re.match(r'^\d{4}-\d{4}$', issn):
+            return issn
+        else:
+            return ""
+    
     return ""
 
 def obtener_isbn(texto_blockquote):
@@ -801,6 +818,10 @@ def obtener_editorial(texto_blockquote):
         
         if editorial.endswith(','):
             editorial = editorial[:-1].strip()
+
+         # Quitar punto (.) o dos puntos (:) al inicio, si existen
+        if editorial.startswith('.') or editorial.startswith(':'):
+            editorial = editorial[1:].strip()
         
         return editorial
     
@@ -837,6 +858,11 @@ def obtener_fasciculo(texto_blockquote):
             fasciculo = texto_blockquote[indice_fasc + len("fasc."):indice_p].strip()
         else:
             fasciculo = texto_blockquote[indice_fasc + len("fasc."):].strip()
+        
+         # Remover el guion inicial si existe
+        if fasciculo.startswith("-"):
+            fasciculo = fasciculo[1:].strip()
+
         return "" if fasciculo in ["N/A", "NA", "N7A", "-", "--", "(N/A)", "(N/A"] or (fasciculo.isdigit() and len(fasciculo) == 4) else fasciculo
     return ""
 
@@ -912,7 +938,9 @@ def obtener_doi(texto_blockquote):
             doi = texto_blockquote[indice_doi_dos + len("doi:"):].strip()
         else:
             doi = texto_blockquote[indice_doi + len("DOI:"):].strip()
-        return "" if doi == "N/A" else doi
+        # Devolver en blanco si DOI es igual a "N/A" o un solo punto "."
+        if doi == "N/A" or doi == ".":
+            return ""
     return ""
 
 # Obtener palabras claves de la publicación
@@ -1061,7 +1089,7 @@ try:
                                 'Fin Formación':fin_formacion,
                                 'Trabajo de Grado':trabajo_grado
                             }
-                            writer.writerow([grupo, enlace_grupo, ano, departamento, ciudad, pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario, instituciones_avaladas_str, instituciones_no_avaladas_str, lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_fin_vinculacion, nombre_citaciones, nacionalidad, sexo, categoria,tipo_formacion,institucion,titulo_formacion,inicio_formacion,fin_formacion,trabajo_grado,area_actuacion,lineas_activas,lineas_no_activas,'','', '', '', '', '', '','','', '','', '', '', '', '', '', '', '', '','','','','',''])
+                            
                         for publicacion in publicaciones:
                             titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista, nombre_libro,issn,isbn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores,codigo_patente,fecha_patente,institucion_patente,nombre_solicitante_patente,via_solicitud_patente,gaceta_publicacion_patente = publicacion
                             publicacion_data = {
@@ -1091,7 +1119,6 @@ try:
                                 'Vía de solicitud de patente':via_solicitud_patente,
                                 'Gaceta Industrial de Publicación de patente':gaceta_publicacion_patente
                             }
-                            writer.writerow([grupo, enlace_grupo, ano, departamento, ciudad, pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario, instituciones_avaladas_str, instituciones_no_avaladas_str, lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_fin_vinculacion, nombre_citaciones, nacionalidad, sexo, categoria, '', '', '', '', '', '', area_actuacion, ', '.join(lineas_activas), ', '.join(lineas_no_activas), titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista, nombre_libro, issn, isbn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores,"","","","","",""])
                             integrante_data['Formación Académica'].append(formacion_data)
                             integrante_data['Publicaciones'].append(publicacion_data)
                             writer.writerow([grupo, enlace_grupo, ano, departamento, ciudad, pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario, instituciones_avaladas_str, instituciones_no_avaladas_str, lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_fin_vinculacion, nombre_citaciones, nacionalidad, sexo, categoria,tipo_formacion,institucion,titulo_formacion,inicio_formacion,fin_formacion,trabajo_grado,area_actuacion,lineas_activas,lineas_no_activas,titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista,nombre_libro,issn, isbn,editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores,codigo_patente,fecha_patente,institucion_patente,nombre_solicitante_patente,via_solicitud_patente, gaceta_publicacion_patente])
