@@ -77,11 +77,13 @@ def formatear_fecha(fecha_texto,meses):
     if len(partes) == 2:  
         mes = partes[0].strip()  
         anio = partes[1].strip()  
-        mes_num = meses.get(mes, "01") 
-        return f"01/{mes_num}/{anio}"
+        if len(anio)==4 and anio.isdigit():
+            mes_num = meses.get(mes, "01") 
+            return f"01/{mes_num}/{anio}"
     elif len(partes) == 1:  
         anio = partes[0].strip()
-        return f"01/01/{anio}"  
+        if len(anio)==4 and anio.isdigit(): 
+            return f"01/01/{anio}"  
     return None
 # Función para extrear la informcaión de los grupos y sus investigadores
 def procesar_grupo(fila):
@@ -111,7 +113,7 @@ def procesar_grupo(fila):
             nombre_grupo = enlace_grupo.text.strip()
             href_enlace = enlace_grupo.get('href')
             numero_url = href_enlace.split('=')[-1]
-            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro={numero_url}'
+            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro=00000000000708'
             # Obtener el nombre del líder y el enlace a su CvLac
             nombre_lider = columnas[3].text.strip()
 
@@ -335,85 +337,6 @@ def procesar_grupo(fila):
                                                         formacion_academica.append((tipo_formacion, institucion,titulo_formacion,inicio_formacion,fin_formacion,trabajo_grado))
 
                                                 fila_formacion=fila_formacion.find_next_sibling('tr')
-                             
-                                        #Sección de patentes
-                                        seccion_patentes = table_cvlac.find('h3', string=['Patentes'])
-                                        if seccion_patentes:
-                                            fila_patentes = seccion_patentes.find_parent('tr').find_next_sibling('tr')
-
-                                            while fila_patentes:
-                                                celdas_patentes = fila_patentes.find_all('td')
-                                               
-
-                                                if len(celdas_patentes) > 0:
-                                                    img_tag = celdas_patentes[0].find('img')
-                                                    estado_patente = 'Vigente' if img_tag else 'No Vigente'
-                                                    
-                                                    tipo_patente_elemento = celdas_patentes[0].find('b')
-                                                    if tipo_patente_elemento:
-                                                        tipo_patente = tipo_patente_elemento.text.strip()
-                                                    else:
-                                                        tipo_patente = None
-                                                    siguiente_fila = fila_patentes.find_next_sibling('tr')
-                                                    if siguiente_fila:
-                                                        blockquote = siguiente_fila.find('blockquote')
-                                                        if blockquote:
-                                                           
-                                                            contenido = blockquote.get_text(separator="|").strip().split('|')
-                                                            
-                                                            codigo_patente = contenido[0].split(' - ')[0].strip()
-                                                            titulo_patente = contenido[0].split(' - ')[1].strip()
-                                                            
-                                                            institucion = None
-                                                            via_solicitud_patente = None
-                                                            pais_patente = None
-                                                            fecha_patente = None
-                                                            nombre_solicitante_patente = None
-                                                            gaceta_publicacion_patente = None
-                                                            
-                                                            etiquetas_i = blockquote.find_all('i')
-                                                            for i in range(len(etiquetas_i)):
-                                                                if 'Institución' in etiquetas_i[i].text:
-                                                                    
-                                                                    siguiente_texto = etiquetas_i[i].next_sibling
-                                                                   
-                                                                    if siguiente_texto:
-                                                                        institucion_patente = siguiente_texto.strip().split(',')[0]      
-
-                                                                if 'Vía de solicitud' in etiquetas_i[i].text:
-                                                                   
-                                                                    siguiente_texto = etiquetas_i[i].next_sibling
-                                                                   
-                                                                    if siguiente_texto:
-                                                                        via_solicitud_patente = siguiente_texto.strip().split('En:')[0]  
-                                                                        pais_texto = siguiente_texto.split('En:')[-1].strip()
-                                                                        pais_patente = pais_texto.split(',')[0].strip()
-                                                                    
-                                                                if 'Nombre del solicitante de la patente' in etiquetas_i[i].text:
-                                                                    
-                                                                    siguiente_texto = etiquetas_i[i].text.split(':')[-1].strip()
-                                                                   
-                                                                    if siguiente_texto:
-                                                                        nombre_solicitante_patente = siguiente_texto.strip().split(',')[0]  
-                                                                
-                                                                if 'Gaceta Industrial de Publicación' in etiquetas_i[i].text:
-                                                                    
-                                                                    siguiente_texto = etiquetas_i[i].text.split(':')[-1].strip()
-                                                                   
-                                                                    if siguiente_texto:
-                                                                        gaceta_publicacion_patente = siguiente_texto.strip().split(',')[0]  
-                                                                
-                                                                # Identificar la fecha de la patente (YYYY-MM-DD)
-                                                                if re.search(r'\d{4}-\d{2}-\d{2}', siguiente_texto):
-                                                                    fecha_patente = re.search(r'\d{4}-\d{2}-\d{2}', siguiente_texto).group(0)
-
-
-                                                        if(tipo_patente,estado_patente,codigo_patente,titulo_patente,institucion_patente, via_solicitud_patente, pais_patente, fecha_patente, nombre_solicitante_patente, gaceta_publicacion_patente) not in patentes:
-                                                            patentes.append((tipo_patente,estado_patente,codigo_patente,titulo_patente,institucion_patente,  via_solicitud_patente, pais_patente, fecha_patente, nombre_solicitante_patente, gaceta_publicacion_patente))        
-                                                           
-                                                fila_patentes = fila_patentes.find_next_sibling('tr')
-
-
                                         #Sección Áreas de Actuación
                                         seccion_area_actuacion=table_cvlac.find('h3',string=['Áreas de actuación'])
                                         if seccion_area_actuacion:
@@ -444,9 +367,10 @@ def procesar_grupo(fila):
                                                         lineas_no_activas.append(texto_linea.replace("Activa:No", "").strip().rstrip(','))
                                                 fila_linea = fila_linea.find_next_sibling('tr')
                                         # Buscar la sección de 'Artículos','Libros','Capitulos de libro', 'Textos en publicaciones no científicas'
-                                        seccion_publicacion = table_cvlac.find('h3', string=['Artículos','Libros','Capitulos de libro', 'Textos en publicaciones no científicas'])
+                                        seccion_publicacion = table_cvlac.find('h3', string=['Artículos','Libros','Capitulos de libro', 'Textos en publicaciones no científicas','Patentes'])
                                         if seccion_publicacion:
-                                            tipo_producto = seccion_publicacion.text
+                                            tipo_producto = seccion_publicacion.text.strip()
+                                            print(tipo_producto)
                                             # Encontrar la fila (tr) siguiente después de la sección "Artículos"
                                             fila_publicacion = seccion_publicacion.find_parent('tr').find_next_sibling('tr')
                                             # Extraer los artículos de la segunda fila (tr)
@@ -454,6 +378,96 @@ def procesar_grupo(fila):
                                                 celdas_publicacion = fila_publicacion.find_all('td')
                                                 #Dentro de blockquote es donde se encuentra toda la informacion de las publicaciones 
                                                 if celdas_publicacion:
+                                                    if tipo_producto == "Patentes":
+                                                                        if len(celdas_publicacion) > 0:
+                                                                            img_tag = celdas_publicacion[0].find('img')
+                                                                            estado_patente = 'Vigente' if img_tag else 'No Vigente'
+                                                                            
+                                                                            tipo_patente_elemento = celdas_publicacion[0].find('b')
+                                                                            if tipo_patente_elemento:
+                                                                                tipo_patente = tipo_patente_elemento.text.strip()
+                                                                            else:
+                                                                                tipo_publicacion = None
+                                                                            siguiente_fila = fila_publicacion.find_next_sibling('tr')
+                                                                            if siguiente_fila:
+                                                                                blockquote = siguiente_fila.find('blockquote')
+                                                                                if blockquote:
+                                                                                
+                                                                                    contenido = blockquote.get_text(separator="|").strip().split('|')
+                                                                                    
+                                                                                    codigo_patente = contenido[0].split(' - ')[0].strip()
+                                                                                    titulo_patente = contenido[0].split(' - ')[1].strip()
+                                                                                    
+                                                                                    institucion_patente = None
+                                                                                    via_solicitud_patente = None
+                                                                                    pais_patente = None
+                                                                                    fecha_patente = None
+                                                                                    nombre_solicitante_patente = None
+                                                                                    gaceta_publicacion_patente = None
+                                                                                    
+                                                                                    etiquetas_i = blockquote.find_all('i')
+                                                                                    for i in range(len(etiquetas_i)):
+                                                                                        if 'Institución' in etiquetas_i[i].text:
+                                                                                            
+                                                                                            siguiente_texto = etiquetas_i[i].next_sibling
+                                                                                        
+                                                                                            if siguiente_texto:
+                                                                                                institucion_patente = siguiente_texto.strip().split(',')[0]      
+
+                                                                                        if 'Vía de solicitud' in etiquetas_i[i].text:
+                                                                                        
+                                                                                            siguiente_texto = etiquetas_i[i].next_sibling
+                                                                                        
+                                                                                            if siguiente_texto:
+                                                                                                via_solicitud_patente = siguiente_texto.strip().split('En:')[0]  
+                                                                                                pais_texto = siguiente_texto.split('En:')[-1].strip()
+                                                                                                pais_patente = pais_texto.split(',')[0].strip()
+                                                                                            
+                                                                                        if 'Nombre del solicitante de la patente' in etiquetas_i[i].text:
+                                                                                            
+                                                                                            siguiente_texto = etiquetas_i[i].text.split(':')[-1].strip()
+                                                                                        
+                                                                                            if siguiente_texto:
+                                                                                                nombre_solicitante_patente= siguiente_texto.strip().split(',')[0]  
+                                                                                
+                                                                                        if 'Gaceta Industrial de Publicación' in etiquetas_i[i].text:
+                                                                                            
+                                                                                            siguiente_texto = etiquetas_i[i].text.split(':')[-1].strip()
+                                                                                        
+                                                                                            if siguiente_texto:
+                                                                                                gaceta_publicacion_patente = siguiente_texto.strip().split(',')[0]  
+                                                                                                
+                                                                                        print(nombre_solicitante_patente)
+                                                                                        # Identificar la fecha de la patente (YYYY-MM-DD)
+                                                                                        if re.search(r'\d{4}-\d{2}-\d{2}', siguiente_texto):
+                                                                                            fecha_patente = re.search(r'\d{4}-\d{2}-\d{2}', siguiente_texto).group(0)
+                                                                                    publicaciones.append((
+                                                                                        titulo_patente,                    # titulo_publicacion
+                                                                                        "",        # nombres_integrantes_str
+                                                                                        tipo_producto,                     # tipo_producto
+                                                                                        tipo_patente,                      # tipo_publicacion
+                                                                                        estado_patente,                    # estado
+                                                                                        pais_patente,                      # pais
+                                                                                        "",                                # titulo_revista
+                                                                                        "",                                # nombre_libro
+                                                                                        "",                                # issn
+                                                                                        "",                                # isbn
+                                                                                        "",                                # editorial
+                                                                                        "",                                # volumen
+                                                                                        "",                                # fasciculo
+                                                                                        "",                                # paginas
+                                                                                        "",                                # año
+                                                                                        "",                                # doi
+                                                                                        "",                                # palabras
+                                                                                        "",                                # areas
+                                                                                        "",                                # sectores
+                                                                                        codigo_patente,                    # NUEVO: codigo_patente
+                                                                                        fecha_patente[:4] if fecha_patente else "",
+                                                                                        institucion_patente,               # NUEVO: institucion_patente
+                                                                                        nombre_solicitante_patente,
+                                                                                        via_solicitud_patente,             # NUEVO: via_solicitud_patente
+                                                                                        gaceta_publicacion_patente         # NUEVO: gaceta_publicacion_patente
+                                                                                        ))
                                                     elementos_blockquote = celdas_publicacion[0].find('blockquote')
                                                     elementos_li = celdas_publicacion[0].find_all('li')
 
@@ -691,20 +705,20 @@ def procesar_grupo(fila):
                                                                     else:
                                                                         # Si publicacion_existente[1] no es una lista, puedes crear una nueva lista con los nombres anteriores y los nuevos
                                                                         publicacion_existente = list(publicacion_existente)
-                                                                        publicacion_existente[1] = publicacion_existente[1].split(', ') + [nombre for nombre in nombres_integrantes_lista if nombre.strip() and nombre.strip() not in publicacion_existente[1]]
+                                                                        publicacion_existente[1] = publicacion_existente[1].split(', ') + [nombre for nombre in nombres_integrantes_lista if nombre.strip() and nombre.strip() not in publicacion_existente[1]]       
                                                                 else:
                                                                     # Si el artículo no está en la lista, agregarlo
-                                                                   publicaciones.append((titulo_publicacion, nombres_integrantes_str,  tipo_producto, tipo_publicacion, estado, pais, titulo_revista,nombre_libro, issn,isbn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores))
+                                                                    publicaciones.append((titulo_publicacion, nombres_integrantes_str,  tipo_producto, tipo_publicacion, estado, pais, titulo_revista,nombre_libro, issn,isbn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores,"","","","","",""))
                                                                    
                                                 #Va a la siguinete publicacion               
                                                 fila_publicacion = fila_publicacion.find_next_sibling('tr')
                                                
                                     # Agregar los datos del integrante y sus artículos a la lista
-                                    integrantes.append([nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_fin_vinculacion, nombre_citaciones, nacionalidad, sexo, categoria,formacion_academica,area_actuacion,lineas_activas,lineas_no_activas,publicaciones,patentes])
+                                    integrantes.append([nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_fin_vinculacion, nombre_citaciones, nacionalidad, sexo, categoria,formacion_academica,area_actuacion,lineas_activas,lineas_no_activas,publicaciones])
 
                                 except requests.exceptions.RequestException:
                                     # En caso de error en la solicitud HTTP
-                                    integrantes.append(['', '', '', '', '', '',[],'',[],[],[],[]])
+                                    integrantes.append(['', '', '', '', '', '',[],'',[],[],[]])
 
             except requests.exceptions.RequestException:
                 # En caso de error en la solicitud HTTP
@@ -981,7 +995,7 @@ try:
                          'Nacionalidad', 'Sexo', 'Categoría','Tipo de Formación','Institución','Título Formación','Inicio Formación','Fin Formación','Trabajo de Grado','Áreas de Actuación','Líneas Activas','Líneas no Activas','Título publicación', 'Integrantes involucrados',
                          'Tipo producto', 'Tipo publicación', 'Estado', 'País', 'Titulo revista', 'Nombre Libro','ISSN','ISBN',
                          'Editorial', 'Volumen', 'Fascículo', 'Páginas', 'Año publicación', 'DOI', 'Palabras clave',
-                         'Areas', 'Sectores','Tipo de Patente','Estado Patente','Código de Patente','Título Patente','Institución de Patente', 'Vía de solicitud de patente', 'Pais patente', 'Fecha patente', 'Nombre del solicitante de la patente', 'Gaceta Industrial de Publicación de patente'])
+                         'Areas', 'Sectores','Código de Patente','Fecha patente','Institución de Patente','Nombre solicitante patente', 'Vía de solicitud de patente', 'Gaceta Industrial de Publicación de patente'])
 
         # Crear hilos para procesar los grupos
         with ThreadPoolExecutor() as executor:
@@ -1011,8 +1025,8 @@ try:
                     'Integrantes': []
                 }
                 for integrante in integrantes:
-                    if len(integrante) == 15:
-                        nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_fin_vinculacion,  nombre_citaciones, nacionalidad, sexo, categoria,formacion_academica,area_actuacion,lineas_activas,lineas_no_activas,publicaciones,patentes = integrante
+                    if len(integrante) == 14:
+                        nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_fin_vinculacion,  nombre_citaciones, nacionalidad, sexo, categoria,formacion_academica,area_actuacion,lineas_activas,lineas_no_activas,publicaciones = integrante
                         integrante_data = {
                             'Nombre del integrante': nombre_integrante,
                             'Enlace al CvLac del investigador': enlace_cvlac_integrante,
@@ -1027,8 +1041,7 @@ try:
                             'Áreas de Actuación':area_actuacion,
                             'Líneas Activas':lineas_activas,
                             'Líneas no Activas':lineas_no_activas,
-                            'Publicaciones': [],
-                            'Patentes':[]
+                            'Publicaciones': []
                         }
                         for formacion in formacion_academica:
                             tipo_formacion,institucion,titulo_formacion,inicio_formacion,fin_formacion,trabajo_grado = formacion
@@ -1042,7 +1055,7 @@ try:
                             }
                             writer.writerow([grupo, enlace_grupo, ano, departamento, ciudad, pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario, instituciones_avaladas_str, instituciones_no_avaladas_str, lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_fin_vinculacion, nombre_citaciones, nacionalidad, sexo, categoria,tipo_formacion,institucion,titulo_formacion,inicio_formacion,fin_formacion,trabajo_grado,area_actuacion,lineas_activas,lineas_no_activas,'','', '', '', '', '', '','','', '','', '', '', '', '', '', '', '', '','','','','',''])
                         for publicacion in publicaciones:
-                            titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista, nombre_libro,issn,isbn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores = publicacion
+                            titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista, nombre_libro,issn,isbn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores,codigo_patente,fecha_patente,institucion_patente,nombre_solicitante_patente,via_solicitud_patente,gaceta_publicacion_patente = publicacion
                             publicacion_data = {
                                 'Título publicación': titulo_publicacion,
                                 'Integrantes involucrados': nombres_integrantes,
@@ -1062,27 +1075,18 @@ try:
                                 'DOI': doi,
                                 'Palabras clave': palabras,
                                 'Areas': areas,
-                                'Sectores': sectores
-                            }
-                            writer.writerow([grupo, enlace_grupo, ano, departamento, ciudad, pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario, instituciones_avaladas_str, instituciones_no_avaladas_str, lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_fin_vinculacion, nombre_citaciones, nacionalidad, sexo, categoria, '', '', '', '', '', '', area_actuacion, ', '.join(lineas_activas), ', '.join(lineas_no_activas), titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista, nombre_libro, issn, isbn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores] + [''] * 3)
-                        for patente in patentes:
-                            tipo_patente,estado_patente,codigo_patente,titulo_patente,institucion_patente,  via_solicitud_patente, pais_patente, fecha_patente, nombre_solicitante_patente, gaceta_publicacion_patente=patente
-                            patente_data={
-                                'Tipo de Patente':tipo_patente,
-                                'Estado Patente':estado_patente,
+                                'Sectores': sectores,
                                 'Código de Patente':codigo_patente,
-                                'Título Patente': titulo_patente,
-                                'Institución de Patente': institucion_patente,
-                                'Vía de solicitud de patente': via_solicitud_patente, 
-                                'Pais patente':  pais_patente, 
-                                'Fecha patente': fecha_patente, 
-                                'Nombre del solicitante de la patente': nombre_solicitante_patente, 
-                                'Gaceta Industrial de Publicación de patente': gaceta_publicacion_patente
+                                'Fecha patente':fecha_patente,
+                                'Institución de Patente':institucion_patente, 
+                                'Nombre solicitante patente':nombre_solicitante_patente,
+                                'Vía de solicitud de patente':via_solicitud_patente,
+                                'Gaceta Industrial de Publicación de patente':gaceta_publicacion_patente
                             }
+                            writer.writerow([grupo, enlace_grupo, ano, departamento, ciudad, pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario, instituciones_avaladas_str, instituciones_no_avaladas_str, lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_fin_vinculacion, nombre_citaciones, nacionalidad, sexo, categoria, '', '', '', '', '', '', area_actuacion, ', '.join(lineas_activas), ', '.join(lineas_no_activas), titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista, nombre_libro, issn, isbn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores,"","","","","",""])
                             integrante_data['Formación Académica'].append(formacion_data)
                             integrante_data['Publicaciones'].append(publicacion_data)
-                            integrante_data['Patentes'].append(patente_data)
-                            writer.writerow([grupo, enlace_grupo, ano, departamento, ciudad, pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario, instituciones_avaladas_str, instituciones_no_avaladas_str, lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_fin_vinculacion, nombre_citaciones, nacionalidad, sexo, categoria,tipo_formacion,institucion,titulo_formacion,inicio_formacion,fin_formacion,trabajo_grado,area_actuacion,lineas_activas,lineas_no_activas,titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista,nombre_libro,issn, isbn,editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores,tipo_patente,estado_patente,codigo_patente,titulo_patente,institucion_patente,  via_solicitud_patente, pais_patente, fecha_patente, nombre_solicitante_patente, gaceta_publicacion_patente])
+                            writer.writerow([grupo, enlace_grupo, ano, departamento, ciudad, pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario, instituciones_avaladas_str, instituciones_no_avaladas_str, lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_fin_vinculacion, nombre_citaciones, nacionalidad, sexo, categoria,tipo_formacion,institucion,titulo_formacion,inicio_formacion,fin_formacion,trabajo_grado,area_actuacion,lineas_activas,lineas_no_activas,titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista,nombre_libro,issn, isbn,editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores,codigo_patente,fecha_patente,institucion_patente,nombre_solicitante_patente,via_solicitud_patente, gaceta_publicacion_patente])
                         grupo_data['Integrantes'].append(integrante_data)
                 data_json.append(grupo_data)
 
