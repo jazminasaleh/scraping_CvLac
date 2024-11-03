@@ -721,7 +721,8 @@ def procesar_grupo(fila):
                                                                     año = obtener_año_en_textos(texto_blockquote)
                                                                 doi = obtener_doi(texto_blockquote)
                                                                 palabras = obtener_palabras_clave(texto_blockquote)
-                                                                areas = obtener_areas(texto_blockquote)
+                                                                areas_generales = obtener_area_general(texto_blockquote)
+                                                                areas_especificas = obtener_areas_especificas(texto_blockquote)
                                                                 sectores = obtener_sectores(texto_blockquote)
                                                                 nombres_integrantes_str = obtener_integrantes(texto_blockquote,  indice_comilla1)
                                                                 nombres_integrantes_lista = nombres_integrantes_str.split(',')
@@ -738,7 +739,7 @@ def procesar_grupo(fila):
                                                                         publicacion_existente[1] = publicacion_existente[1].split(', ') + [nombre for nombre in nombres_integrantes_lista if nombre.strip() and nombre.strip() not in publicacion_existente[1]]       
                                                                 else:
                                                                     # Si el artículo no está en la lista, agregarlo
-                                                                    publicaciones.append((titulo_publicacion, nombres_integrantes_str,  tipo_producto, tipo_publicacion, estado, pais, titulo_revista,nombre_libro, issn,isbn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores,"","","","","",""))
+                                                                    publicaciones.append((titulo_publicacion, nombres_integrantes_str,  tipo_producto, tipo_publicacion, estado, pais, titulo_revista,nombre_libro, issn,isbn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas_generales, areas_especificas, sectores,"","","","","",""))
                                                                    
                                                 #Va a la siguinete publicacion               
                                                 fila_publicacion = fila_publicacion.find_next_sibling('tr')
@@ -999,7 +1000,10 @@ def obtener_palabras_clave(texto_blockquote):
     return ""
 
 
-def obtener_areas(texto_blockquote):
+def obtener_area_general(texto_blockquote):
+    """
+    Extrae la primera área general de un texto dado.
+    """
     indice_areas = texto_blockquote.find("Areas:")
     if indice_areas != -1:
         indice_sectores = texto_blockquote.find("Sectores:", indice_areas)
@@ -1007,8 +1011,28 @@ def obtener_areas(texto_blockquote):
             areas_texto = texto_blockquote[indice_areas + len("Areas:"):indice_sectores].strip()
         else:
             areas_texto = texto_blockquote[indice_areas + len("Areas:"):].strip()
-        areas_limpio = [area.strip() for area in areas_texto.split(",") if area.strip()]
-        return ', '.join(areas_limpio)
+        
+        # Dividir por " -- " y tomar la primera área como área general
+        area_general = areas_texto.split(" -- ")[0].strip()
+        return area_general
+    return ""
+
+def obtener_areas_especificas(texto_blockquote):
+    """
+    Extrae las áreas específicas (todas menos la primera área general)
+    """
+    indice_areas = texto_blockquote.find("Areas:")
+    if indice_areas != -1:
+        indice_sectores = texto_blockquote.find("Sectores:", indice_areas)
+        if indice_sectores != -1:
+            areas_texto = texto_blockquote[indice_areas + len("Areas:"):indice_sectores].strip()
+        else:
+            areas_texto = texto_blockquote[indice_areas + len("Areas:"):].strip()
+        
+        # Dividir por " -- " y tomar todas las áreas específicas después de la primera
+        areas_divididas = areas_texto.split(" -- ")
+        areas_especificas = [area.strip() for area in areas_divididas[1:]]
+        return ', '.join(areas_especificas)
     return ""
 
 def obtener_sectores(texto_blockquote):
@@ -1066,7 +1090,7 @@ try:
                          'Nacionalidad', 'Sexo', 'Categoría','Tipo de Formación','Institución','Título Formación','Inicio Formación','Fin Formación','Trabajo de Grado','Áreas de Actuación','Líneas Activas','Líneas no Activas','Título publicación', 'Integrantes involucrados',
                          'Tipo producto', 'Tipo publicación', 'Estado', 'País', 'Titulo revista', 'Nombre Libro','ISSN','ISBN',
                          'Editorial', 'Volumen', 'Fascículo', 'Páginas', 'Año publicación', 'DOI', 'Palabras clave',
-                         'Areas', 'Sectores','Código de Patente','Fecha patente','Institución de Patente','Nombre solicitante patente', 'Vía de solicitud de patente', 'Gaceta Industrial de Publicación de patente'])
+                         'Área general', 'Áreas especificas', 'Sectores','Código de Patente','Fecha patente','Institución de Patente','Nombre solicitante patente', 'Vía de solicitud de patente', 'Gaceta Industrial de Publicación de patente'])
 
         # Crear hilos para procesar los grupos
         with ThreadPoolExecutor() as executor:
@@ -1140,7 +1164,7 @@ try:
                             integrante_data['Formación Académica'].append(formacion_data)  
             
                         for publicacion in publicaciones:
-                            titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista, nombre_libro,issn,isbn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores,codigo_patente,fecha_patente,institucion_patente,nombre_solicitante_patente,via_solicitud_patente,gaceta_publicacion_patente = publicacion
+                            titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista, nombre_libro,issn,isbn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas_generales, areas_especificas, sectores,codigo_patente,fecha_patente,institucion_patente,nombre_solicitante_patente,via_solicitud_patente,gaceta_publicacion_patente = publicacion
                             publicacion_data = {
                                 'Título publicación': titulo_publicacion,
                                 'Integrantes involucrados': nombres_integrantes,
@@ -1159,7 +1183,8 @@ try:
                                 'Año publicación': año,
                                 'DOI': doi,
                                 'Palabras clave': palabras,
-                                'Areas': areas,
+                                'Área general': areas_generales, 
+                                'Áreas espeficícas': areas_especificas,
                                 'Sectores': sectores,
                                 'Código de Patente':codigo_patente,
                                 'Fecha patente':fecha_patente,
@@ -1181,7 +1206,7 @@ try:
                                 lineas_activas, lineas_no_activas, titulo_publicacion, 
                                 nombres_integrantes, tipo_producto, tipo_publicacion, estado, 
                                 pais, titulo_revista, nombre_libro, issn, isbn, editorial, 
-                                volumen, fasciculo, paginas, año, doi, palabras, areas, 
+                                volumen, fasciculo, paginas, año, doi, palabras, areas_generales, areas_especificas,
                                 sectores, codigo_patente, fecha_patente, institucion_patente,
                                 nombre_solicitante_patente, via_solicitud_patente, 
                                 gaceta_publicacion_patente
