@@ -452,6 +452,7 @@ def procesar_grupo(fila):
                                                                                         # Identificar la fecha de la patente (YYYY-MM-DD)
                                                                                         if re.search(r'\d{4}-\d{2}-\d{2}', siguiente_texto):
                                                                                             fecha_patente = re.search(r'\d{4}-\d{2}-\d{2}', siguiente_texto).group(0)
+                                                                                   
                                                                                     publicaciones.append((
                                                                                         titulo_patente,                    # titulo_publicacion
                                                                                         "",        # nombres_integrantes_str
@@ -479,6 +480,7 @@ def procesar_grupo(fila):
                                                                                         via_solicitud_patente,             # NUEVO: via_solicitud_patente
                                                                                         gaceta_publicacion_patente         # NUEVO: gaceta_publicacion_patente
                                                                                         ))
+                                                                                        
                                                     elementos_blockquote = celdas_publicacion[0].find('blockquote')
                                                     elementos_li = celdas_publicacion[0].find_all('li')
 
@@ -1037,7 +1039,7 @@ try:
         with ThreadPoolExecutor() as executor:
             # Mapear la función procesar_grupo a cada fila de la tabla
             resultados = list(executor.map(procesar_grupo, filas))
-
+        publicaciones_procesadas = [] 
         for datos in resultados:
             if datos:
                 grupo, enlace_grupo,  ano, departamento,  ciudad,  pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario,  instituciones_avaladas_str, instituciones_no_avaladas_str, lineas_investigacion_str, lider, cvlac_lider, integrantes = datos
@@ -1090,6 +1092,19 @@ try:
                                 'Trabajo de Grado':trabajo_grado
                             }
                             
+                            writer.writerow([
+                            grupo, enlace_grupo, ano, departamento, ciudad, pagina_web, email, 
+                            clasificacion, areas_grupo, programa, programa_secundario, 
+                            instituciones_avaladas_str, instituciones_no_avaladas_str, 
+                            lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, 
+                            enlace_cvlac_integrante, nombre_citaciones, vinculacion, 
+                            horas_dedicacion, inicio_fin_vinculacion, nacionalidad, sexo, 
+                            categoria, tipo_formacion, institucion, titulo_formacion, 
+                            inicio_formacion, fin_formacion, trabajo_grado, area_actuacion, 
+                            lineas_activas, lineas_no_activas
+                        ] + [""] * 25) 
+                            integrante_data['Formación Académica'].append(formacion_data)  
+            
                         for publicacion in publicaciones:
                             titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista, nombre_libro,issn,isbn, editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores,codigo_patente,fecha_patente,institucion_patente,nombre_solicitante_patente,via_solicitud_patente,gaceta_publicacion_patente = publicacion
                             publicacion_data = {
@@ -1119,9 +1134,26 @@ try:
                                 'Vía de solicitud de patente':via_solicitud_patente,
                                 'Gaceta Industrial de Publicación de patente':gaceta_publicacion_patente
                             }
-                            integrante_data['Formación Académica'].append(formacion_data)
+                            if titulo_publicacion not in [p['Título publicación']for p in publicaciones_procesadas]:
+                                publicaciones_procesadas.append(publicacion_data)
+                                writer.writerow([
+                                grupo, enlace_grupo, ano, departamento, ciudad, pagina_web, email, 
+                                clasificacion, areas_grupo, programa, programa_secundario, 
+                                instituciones_avaladas_str, instituciones_no_avaladas_str, 
+                                lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, 
+                                enlace_cvlac_integrante, nombre_citaciones, vinculacion, 
+                                horas_dedicacion, inicio_fin_vinculacion, nacionalidad, sexo, 
+                                categoria, "", "", "", "", "", "", area_actuacion, 
+                                lineas_activas, lineas_no_activas, titulo_publicacion, 
+                                nombres_integrantes, tipo_producto, tipo_publicacion, estado, 
+                                pais, titulo_revista, nombre_libro, issn, isbn, editorial, 
+                                volumen, fasciculo, paginas, año, doi, palabras, areas, 
+                                sectores, codigo_patente, fecha_patente, institucion_patente,
+                                nombre_solicitante_patente, via_solicitud_patente, 
+                                gaceta_publicacion_patente
+                            ])
+                            
                             integrante_data['Publicaciones'].append(publicacion_data)
-                            writer.writerow([grupo, enlace_grupo, ano, departamento, ciudad, pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario, instituciones_avaladas_str, instituciones_no_avaladas_str, lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_fin_vinculacion, nombre_citaciones, nacionalidad, sexo, categoria,tipo_formacion,institucion,titulo_formacion,inicio_formacion,fin_formacion,trabajo_grado,area_actuacion,lineas_activas,lineas_no_activas,titulo_publicacion, nombres_integrantes, tipo_producto, tipo_publicacion, estado, pais, titulo_revista,nombre_libro,issn, isbn,editorial, volumen, fasciculo, paginas, año, doi, palabras, areas, sectores,codigo_patente,fecha_patente,institucion_patente,nombre_solicitante_patente,via_solicitud_patente, gaceta_publicacion_patente])
                         grupo_data['Integrantes'].append(integrante_data)
                 data_json.append(grupo_data)
 
