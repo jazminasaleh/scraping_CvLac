@@ -93,7 +93,8 @@ def procesar_grupo(fila):
     paginaweb_grupo = ""
     email_grupo = ""
     clasificacion_grupo = ""
-    areas_grupo = ""
+    areas_especificas_grupo = ""
+    areas_general_grupo  = ""
     programacion_grupo = ""
     programacion_secundaria_grupo = "" 
     instituciones_avaladas_str = ""
@@ -113,7 +114,7 @@ def procesar_grupo(fila):
             nombre_grupo = enlace_grupo.text.strip()
             href_enlace = enlace_grupo.get('href')
             numero_url = href_enlace.split('=')[-1]
-            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro=00000000001972'
+            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro=00000000004995'
             # Obtener el nombre del líder y el enlace a su CvLac
             nombre_lider = columnas[3].text.strip()
 
@@ -140,7 +141,8 @@ def procesar_grupo(fila):
                 paginaweb_grupo = ""
                 email_grupo = ""
                 clasificacion_grupo = ""
-                areas_grupo = ""
+                areas_especificas_grupo = ""
+                areas_general_grupo  = ""
                 programacion_grupo = ""
                 programacion_secundaria_grupo = "" 
                 instituciones_str = ""
@@ -197,9 +199,17 @@ def procesar_grupo(fila):
                                         clasificacion_grupo = "Sin clasificar"
                                 elif etiqueta == "Área de conocimiento":
                                     if valor:
-                                        areas_grupo = valor
+                                        # Dividir el texto por " -- "
+                                        areas_divididas = valor.split(" -- ")
+                                        
+                                        # Guardar el primer elemento en `areas_general`
+                                        areas_general_grupo = areas_divididas[0]
+                                        
+                                        # Guardar el resto en `areas_especificas`
+                                        areas_especificas_grupo = areas_divididas[1:]  # Esto será una lista de áreas específicas
                                     else:
-                                        areas_grupo = ""
+                                        areas_general_grupo = ""
+                                        areas_especificas_grupo = []
                                 elif etiqueta == "Programa nacional de ciencia y tecnología":
                                     if valor:
                                         programacion_grupo = valor
@@ -381,7 +391,6 @@ def procesar_grupo(fila):
                                         seccion_publicacion = table_cvlac.find('h3', string=['Artículos','Libros','Capitulos de libro', 'Textos en publicaciones no científicas','Patentes'])
                                         if seccion_publicacion:
                                             tipo_producto = seccion_publicacion.text.strip()
-                                            print(tipo_producto)
                                             # Encontrar la fila (tr) siguiente después de la sección "Artículos"
                                             fila_publicacion = seccion_publicacion.find_parent('tr').find_next_sibling('tr')
                                             # Extraer los artículos de la segunda fila (tr)
@@ -549,7 +558,8 @@ def procesar_grupo(fila):
                                                                        elif publicacion_comillas_dobles_separadas2_cuartas != -1:
                                                                         titulo_publicacion = texto_blockquote[publicacion_comillas_dobles_separadas1 + 1:publicacion_comillas_dobles_separadas2_cuartas]
                                                                         titulo_publicacion = titulo_publicacion.strip('"')
-                                                                                                                                    
+                                                                
+                                                                titulo_publicacion = re.sub(r'^[.,:;? -]+', '', titulo_publicacion)                                                                    
                                                                 if tipo_publicacion:
                                                                     tipo_publicacion = tipo_publicacion.title()
                                                                 
@@ -745,7 +755,7 @@ def procesar_grupo(fila):
                 integrantes = []
 
             # Devolver los datos del grupo y sus integrantes
-            return [nombre_grupo, enlace_gruplac_grupo, ano_mes_formacion_grupo, departamento_grupo, ciudad_grupo, paginaweb_grupo, email_grupo, clasificacion_grupo, areas_grupo, programacion_grupo, programacion_secundaria_grupo, instituciones_avaladas_str,  instituciones_no_avaladas_str, lineas_investigacion_str, nombre_lider, cvlac_lider, integrantes]
+            return [nombre_grupo, enlace_gruplac_grupo, ano_mes_formacion_grupo, departamento_grupo, ciudad_grupo, paginaweb_grupo, email_grupo, clasificacion_grupo, areas_general_grupo, areas_especificas_grupo, programacion_grupo, programacion_secundaria_grupo, instituciones_avaladas_str,  instituciones_no_avaladas_str, lineas_investigacion_str, nombre_lider, cvlac_lider, integrantes]
 
     return []
 
@@ -1051,7 +1061,7 @@ try:
         data_json = []
 
         # El nombre de las columnas en el CSV
-        writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Fecha de formcación', 'Departamento', 'Ciudad',  'Página web', 'E-mail', 'Clasificación', 'Área de conocimiento','Programa nacional', 'Programa nacional(secundario)', 'Instituciones avaladas','Instituciones no avaladas',  'Líneas de investigación',  'Nombre del líder', 'Enlace al CvLac líder',
+        writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Fecha de formcación', 'Departamento', 'Ciudad',  'Página web', 'E-mail', 'Clasificación', 'Área de conocimiento general', 'Áreas de conocimiento especificas', 'Programa nacional', 'Programa nacional(secundario)', 'Instituciones avaladas','Instituciones no avaladas',  'Líneas de investigación',  'Nombre del líder', 'Enlace al CvLac líder',
                          'Nombre del integrante', 'Enlace al CvLac del investigador', 'Nombre en citaciones', 'Vinculación', 'Horas dedicación', 'Inicio - Fin Vinculación',
                          'Nacionalidad', 'Sexo', 'Categoría','Tipo de Formación','Institución','Título Formación','Inicio Formación','Fin Formación','Trabajo de Grado','Áreas de Actuación','Líneas Activas','Líneas no Activas','Título publicación', 'Integrantes involucrados',
                          'Tipo producto', 'Tipo publicación', 'Estado', 'País', 'Titulo revista', 'Nombre Libro','ISSN','ISBN',
@@ -1065,7 +1075,7 @@ try:
         publicaciones_procesadas = [] 
         for datos in resultados:
             if datos:
-                grupo, enlace_grupo,  ano, departamento,  ciudad,  pagina_web, email, clasificacion, areas_grupo, programa, programa_secundario,  instituciones_avaladas_str, instituciones_no_avaladas_str, lineas_investigacion_str, lider, cvlac_lider, integrantes = datos
+                grupo, enlace_grupo,  ano, departamento,  ciudad,  pagina_web, email, clasificacion, areas_general_grupo, areas_especificas_grupo, programa, programa_secundario,  instituciones_avaladas_str, instituciones_no_avaladas_str, lineas_investigacion_str, lider, cvlac_lider, integrantes = datos
                 grupo_data = {
                     'Nombre del grupo': grupo,
                     'Enlace al GrupLac': enlace_grupo,
@@ -1075,7 +1085,8 @@ try:
                     'Página web': pagina_web,
                     'E-mail': email,
                     'Clasificación': clasificacion,
-                    'Área de conocimiento': areas_grupo,
+                    'Área de conocimiento general': areas_general_grupo,
+                    'Áreas de conocimeinto especificas': areas_especificas_grupo,
                     'Programa nacional': programa,
                     'Programa nacional(secundario)': programa_secundario,
                     'Instituciones avaladas': instituciones_avaladas_str,
@@ -1117,7 +1128,7 @@ try:
                             
                             writer.writerow([
                             grupo, enlace_grupo, ano, departamento, ciudad, pagina_web, email, 
-                            clasificacion, areas_grupo, programa, programa_secundario, 
+                            clasificacion, areas_general_grupo, areas_especificas_grupo, programa, programa_secundario, 
                             instituciones_avaladas_str, instituciones_no_avaladas_str, 
                             lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, 
                             enlace_cvlac_integrante, nombre_citaciones, vinculacion, 
@@ -1161,7 +1172,7 @@ try:
                                 publicaciones_procesadas.append(publicacion_data)
                                 writer.writerow([
                                 grupo, enlace_grupo, ano, departamento, ciudad, pagina_web, email, 
-                                clasificacion, areas_grupo, programa, programa_secundario, 
+                                clasificacion, areas_general_grupo, areas_especificas_grupo, programa, programa_secundario, 
                                 instituciones_avaladas_str, instituciones_no_avaladas_str, 
                                 lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, 
                                 enlace_cvlac_integrante, nombre_citaciones, vinculacion, 
