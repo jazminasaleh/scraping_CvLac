@@ -113,7 +113,7 @@ def procesar_grupo(fila):
             nombre_grupo = enlace_grupo.text.strip()
             href_enlace = enlace_grupo.get('href')
             numero_url = href_enlace.split('=')[-1]
-            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro=00000000006350'
+            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro=00000000001972'
             # Obtener el nombre del líder y el enlace a su CvLac
             nombre_lider = columnas[3].text.strip()
 
@@ -549,8 +549,9 @@ def procesar_grupo(fila):
                                                                        elif publicacion_comillas_dobles_separadas2_cuartas != -1:
                                                                         titulo_publicacion = texto_blockquote[publicacion_comillas_dobles_separadas1 + 1:publicacion_comillas_dobles_separadas2_cuartas]
                                                                         titulo_publicacion = titulo_publicacion.strip('"')
-                                                                    
-                                                                tipo_publicacion = tipo_publicacion.title()
+                                                                                                                                    
+                                                                if tipo_publicacion:
+                                                                    tipo_publicacion = tipo_publicacion.title()
                                                                 
                                                                 indice_pais = texto_blockquote.find("En:")
                                                                 if indice_pais != -1:
@@ -705,6 +706,7 @@ def procesar_grupo(fila):
                                                                 elif tipo_producto =="Capitulos de libro":
                                                                     año=obtener_año_capitulos(texto_blockquote)
                                                                     nombre_libro=obtener_nombre_libro(texto_blockquote)
+                                                                    nombre_libro=limpiar_nombre_libro(nombre_libro)
                                                                 elif tipo_producto=="Textos en publicaciones no científicas":
                                                                     año = obtener_año_en_textos(texto_blockquote)
                                                                 doi = obtener_doi(texto_blockquote)
@@ -776,20 +778,41 @@ def obtener_issn(texto_blockquote):
     return ""
 
 def obtener_isbn(texto_blockquote):
+    # Buscar la posición inicial de "ISBN:"
     indice_isbn = texto_blockquote.find("ISBN:")
     if indice_isbn != -1:
+        # Buscar los delimitadores posteriores a "ISBN:"
         indice_v = texto_blockquote.find("v.", indice_isbn)
         indice_ed = texto_blockquote.find("ed:", indice_isbn)
         indice_p = texto_blockquote.find("p.", indice_isbn)
         
+        # Encontrar el primer delimitador para extraer el ISBN
         topes = [i for i in [indice_v, indice_ed, indice_p] if i != -1]
         if topes:
             primer_tope = min(topes)
-            return texto_blockquote[indice_isbn + len("ISBN:"):primer_tope].strip().strip(',')
+            isbn = texto_blockquote[indice_isbn + len("ISBN:"):primer_tope].strip().strip(',')
         else:
-            return texto_blockquote[indice_isbn + len("ISBN:"):].strip().strip(',')
+            isbn = texto_blockquote[indice_isbn + len("ISBN:"):].strip().strip(',')
+        
+        # Verificar si el ISBN es válido
+        # Patrón para ISBN válido: dígitos opcionalmente separados por guiones
+        isbn_pattern = re.compile(r'^(?!0+$)(?!X+$)(?!x+$)[0-9Xx-]+$')
+        
+        # Excluir secuencias de ceros, "X" repetidas, letras "o" o "O", etc.
+        if isbn_pattern.match(isbn) and isbn not in ["00000000", "000-000-000-0", "000-000-0000", "XXXXXX", "oooooo", "OOOOOO"]:
+            return isbn
     
     return ""
+def limpiar_nombre_libro(nombre_libro):
+    if nombre_libro.startswith('"') and nombre_libro.endswith('"'):
+        nombre_libro = nombre_libro[1:-1]
+    
+    nombre_libro = re.sub(r'^[,.:).]*', '', nombre_libro).strip()
+    contenido_corchetes = re.search(r'\[(.*?)\]', nombre_libro)
+    if contenido_corchetes:
+        nombre_libro = contenido_corchetes.group(1).strip() 
+    
+    return nombre_libro
 
 def obtener_nombre_libro(texto_blockquote):
     indice_inicio_comillas = texto_blockquote.find('"')
