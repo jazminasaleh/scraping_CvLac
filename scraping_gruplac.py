@@ -34,7 +34,7 @@ os.environ['http_proxy'] = ''
 os.environ['https_proxy'] = ''
 
 # URL del GrupLac, se toman los 152 grupos
-url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=152'
+url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=1'
 
 # Los resultados se van a almacenar en un csv con nombre resultados_grupos
 archivo_salida_json = 'resultados_grupos_json.json'
@@ -114,7 +114,7 @@ def procesar_grupo(fila):
             nombre_grupo = enlace_grupo.text.strip()
             href_enlace = enlace_grupo.get('href')
             numero_url = href_enlace.split('=')[-1]
-            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro={numero_url}'
+            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro=00000000011805'
             # Obtener el nombre del líder y el enlace a su CvLac
             nombre_lider = columnas[3].text.strip()
 
@@ -349,7 +349,7 @@ def procesar_grupo(fila):
                                                             titulo_formacion = titulo_formacion.lower()
                                                     inicio_formacion = contenido[3].strip() if len(contenido) > 3 else None
                                                     trabajo_grado = contenido[4].strip() if len(contenido) > 4 else None
-
+                                                    
                                                     if inicio_formacion:
                                                         fechas_formacion=inicio_formacion.split("-")
                                                         inicio_formacion=formatear_fecha(fechas_formacion[0].strip(),meses) if len(fechas_formacion) > 0 else None
@@ -369,7 +369,9 @@ def procesar_grupo(fila):
                                                 for celda in celdas_area:
                                                     texto_unico.update(celda.get_text(strip=True).split(' -- ')) 
                                                 fila_area = fila_area.find_next_sibling('tr')
-                                            area_actuacion = ','.join(sorted(texto_unico))  
+                                            areas_ordenadas = sorted(texto_unico)
+                                            area_general_inv = areas_ordenadas[0] if areas_ordenadas else ""
+                                            areas_especificas_inv = areas_ordenadas[1:] if len(areas_ordenadas) > 1 else []   
                                         # Sección Líneas de Investigación
                                         seccion_lineas_investigacion = table_cvlac.find('h3', string=['Líneas de investigación'])
                                         if seccion_lineas_investigacion:
@@ -383,7 +385,8 @@ def procesar_grupo(fila):
                                                 for celda in celdas_linea:
                                                     texto_linea = celda.get_text(strip=True).rstrip(',')
                                                     if "Activa:Si" in texto_linea:
-                                                        lineas_activas.append(texto_linea.replace("Activa:Si", "").strip().rstrip(','))
+                                                        texto_limpio = re.sub(r'^[^a-zA-Z]+|[\'"]+$', '', texto_linea.replace("Activa:Si", "").strip().rstrip(','))
+                                                        lineas_activas.append(texto_limpio)
                                                     elif "Activa:No" in texto_linea:
                                                         lineas_no_activas.append(texto_linea.replace("Activa:No", "").strip().rstrip(','))
                                                 fila_linea = fila_linea.find_next_sibling('tr')
@@ -745,7 +748,7 @@ def procesar_grupo(fila):
                                                 fila_publicacion = fila_publicacion.find_next_sibling('tr')
                                                
                                     # Agregar los datos del integrante y sus artículos a la lista
-                                    integrantes.append([nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_fin_vinculacion, nombre_citaciones, nacionalidad, sexo, categoria,formacion_academica,area_actuacion,lineas_activas,lineas_no_activas,publicaciones])
+                                    integrantes.append([nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_fin_vinculacion, nombre_citaciones, nacionalidad, sexo, categoria,formacion_academica,area_general_inv,areas_especificas_inv,lineas_activas,lineas_no_activas,publicaciones])
 
                                 except requests.exceptions.RequestException:
                                     # En caso de error en la solicitud HTTP
@@ -805,14 +808,9 @@ def obtener_isbn(texto_blockquote):
         else:
             isbn = texto_blockquote[indice_isbn + len("ISBN:"):].strip().strip(',')
         
-        # Verificar si el ISBN es válido
-        # Patrón para ISBN válido: dígitos opcionalmente separados por guiones
-        isbn_pattern = re.compile(r'^(?!0+$)(?!X+$)(?!x+$)[0-9Xx-]+$')
-        
-        # Excluir secuencias de ceros, "X" repetidas, letras "o" o "O", etc.
-        if isbn_pattern.match(isbn) and isbn not in ["00000000", "000-000-000-0", "000-000-0000", "XXXXXX", "oooooo", "OOOOOO"]:
+        isbn_pattern = re.compile(r'^(?:\d{9}[\dXx]|\d{13})$')
+        if isbn_pattern.match(isbn) and isbn not in ["0000000000", "0000000000000", "XXXXXXXXXX", "oooooo", "OOOOOO"]:
             return isbn
-    
     return ""
 def limpiar_nombre_libro(nombre_libro):
     if nombre_libro.startswith('"') and nombre_libro.endswith('"'):
@@ -1087,7 +1085,7 @@ try:
         # El nombre de las columnas en el CSV
         writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Fecha de formcación', 'Departamento', 'Ciudad',  'Página web', 'E-mail', 'Clasificación', 'Área de conocimiento general', 'Áreas de conocimiento especificas', 'Programa nacional', 'Programa nacional(secundario)', 'Instituciones avaladas','Instituciones no avaladas',  'Líneas de investigación',  'Nombre del líder', 'Enlace al CvLac líder',
                          'Nombre del integrante', 'Enlace al CvLac del investigador', 'Nombre en citaciones', 'Vinculación', 'Horas dedicación', 'Inicio - Fin Vinculación',
-                         'Nacionalidad', 'Sexo', 'Categoría','Tipo de Formación','Institución','Título Formación','Inicio Formación','Fin Formación','Trabajo de Grado','Áreas de Actuación','Líneas Activas','Líneas no Activas','Título publicación', 'Integrantes involucrados',
+                         'Nacionalidad', 'Sexo', 'Categoría','Tipo de Formación','Institución','Título Formación','Inicio Formación','Fin Formación','Trabajo de Grado','Area General Investigador','Area Especifica Investigador','Líneas Activas','Líneas no Activas','Título publicación', 'Integrantes involucrados',
                          'Tipo producto', 'Tipo publicación', 'Estado', 'País', 'Titulo revista', 'Nombre Libro','ISSN','ISBN',
                          'Editorial', 'Volumen', 'Fascículo', 'Páginas', 'Año publicación', 'DOI', 'Palabras clave',
                          'Área general', 'Áreas especificas', 'Sectores','Código de Patente','Fecha patente','Institución de Patente','Nombre solicitante patente', 'Vía de solicitud de patente', 'Gaceta Industrial de Publicación de patente'])
@@ -1121,8 +1119,8 @@ try:
                     'Integrantes': []
                 }
                 for integrante in integrantes:
-                    if len(integrante) == 14:
-                        nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_fin_vinculacion,  nombre_citaciones, nacionalidad, sexo, categoria,formacion_academica,area_actuacion,lineas_activas,lineas_no_activas,publicaciones = integrante
+                    if len(integrante) == 15:
+                        nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_fin_vinculacion,  nombre_citaciones, nacionalidad, sexo, categoria,formacion_academica,area_general_inv,areas_especificas_inv,lineas_activas,lineas_no_activas,publicaciones = integrante
                         integrante_data = {
                             'Nombre del integrante': nombre_integrante,
                             'Enlace al CvLac del investigador': enlace_cvlac_integrante,
@@ -1134,7 +1132,8 @@ try:
                             'Sexo': sexo,
                             'Categoría': categoria,
                             'Formación Académica':[],
-                            'Áreas de Actuación':area_actuacion,
+                            'Area General Investigador':area_general_inv,
+                            'Areas Especificas Investigador':areas_especificas_inv,
                             'Líneas Activas':lineas_activas,
                             'Líneas no Activas':lineas_no_activas,
                             'Publicaciones': []
@@ -1158,7 +1157,7 @@ try:
                             enlace_cvlac_integrante, nombre_citaciones, vinculacion, 
                             horas_dedicacion, inicio_fin_vinculacion, nacionalidad, sexo, 
                             categoria, tipo_formacion, institucion, titulo_formacion, 
-                            inicio_formacion, fin_formacion, trabajo_grado, area_actuacion, 
+                            inicio_formacion, fin_formacion, trabajo_grado, area_general_inv,areas_especificas_inv, 
                             lineas_activas, lineas_no_activas
                         ] + [""] * 25) 
                             integrante_data['Formación Académica'].append(formacion_data)  
@@ -1204,7 +1203,7 @@ try:
                                 lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, 
                                 enlace_cvlac_integrante, nombre_citaciones, vinculacion, 
                                 horas_dedicacion, inicio_fin_vinculacion, nacionalidad, sexo, 
-                                categoria, "", "", "", "", "", "", area_actuacion, 
+                                categoria, "", "", "", "", "", "", area_general_inv,areas_especificas_inv, 
                                 lineas_activas, lineas_no_activas, titulo_publicacion, 
                                 nombres_integrantes, tipo_producto, tipo_publicacion, estado, 
                                 pais, titulo_revista, nombre_libro, issn, isbn, editorial, 
