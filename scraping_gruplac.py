@@ -34,7 +34,7 @@ os.environ['http_proxy'] = ''
 os.environ['https_proxy'] = ''
 
 # URL del GrupLac, se toman los 152 grupos
-url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=1'
+url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=152'
 
 # Los resultados se van a almacenar en un csv con nombre resultados_grupos
 archivo_salida_json = 'resultados_grupos_json.json'
@@ -114,7 +114,7 @@ def procesar_grupo(fila):
             nombre_grupo = enlace_grupo.text.strip()
             href_enlace = enlace_grupo.get('href')
             numero_url = href_enlace.split('=')[-1]
-            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro=00000000011805'
+            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro={numero_url}'
             # Obtener el nombre del líder y el enlace a su CvLac
             nombre_lider = columnas[3].text.strip()
 
@@ -294,7 +294,8 @@ def procesar_grupo(fila):
                                     categoria = ''
                                     nacionalidad = ''
                                     sexo = ''
-                                    area_actuacion=''
+                                    area_general_inv = ''
+                                    areas_especificas_inv=''
                                     formacion_academica=[]
                                     patentes=[]
                                     publicaciones= []
@@ -349,7 +350,15 @@ def procesar_grupo(fila):
                                                             titulo_formacion = titulo_formacion.lower()
                                                     inicio_formacion = contenido[3].strip() if len(contenido) > 3 else None
                                                     trabajo_grado = contenido[4].strip() if len(contenido) > 4 else None
-                                                    
+                                                    if trabajo_grado:
+                                                        trabajo_grado = re.sub(r'^[\'"\[\]]+|[\'"\[\]]+$', '', trabajo_grado)
+                                                        trabajo_grado = re.sub(r'^[¨:]+|[¨:]+$', '', trabajo_grado)
+                                                        trabajo_grado = trabajo_grado.lower()
+                                                        trabajo_grado = re.sub(r'^[-.]', '', trabajo_grado).strip()
+                                                        trabajo_grado = re.sub(r'\.{2,}|\-{2,}', '', trabajo_grado).strip()
+
+                                                        if len(trabajo_grado.split()) == 1:
+                                                            trabajo_grado= ""
                                                     if inicio_formacion:
                                                         fechas_formacion=inicio_formacion.split("-")
                                                         inicio_formacion=formatear_fecha(fechas_formacion[0].strip(),meses) if len(fechas_formacion) > 0 else None
@@ -359,6 +368,7 @@ def procesar_grupo(fila):
 
                                                 fila_formacion=fila_formacion.find_next_sibling('tr')
                                         #Sección Áreas de Actuación
+                                        
                                         seccion_area_actuacion=table_cvlac.find('h3',string=['Áreas de actuación'])
                                         if seccion_area_actuacion:
                                             
@@ -483,6 +493,7 @@ def procesar_grupo(fila):
                                                                                         "",                                # año
                                                                                         "",                                # doi
                                                                                         "",                                # palabras
+                                                                                        "",   
                                                                                         "",                                # areas
                                                                                         "",                                # sectores
                                                                                         codigo_patente,                    # NUEVO: codigo_patente
@@ -752,7 +763,7 @@ def procesar_grupo(fila):
 
                                 except requests.exceptions.RequestException:
                                     # En caso de error en la solicitud HTTP
-                                    integrantes.append(['', '', '', '', '', '',[],'',[],[],[]])
+                                    integrantes.append(['', '', '', '', '', '',[],'','',[],[],[]])
 
             except requests.exceptions.RequestException:
                 # En caso de error en la solicitud HTTP
@@ -791,36 +802,49 @@ def obtener_issn(texto_blockquote):
     
     return ""
 
+
+
+
 def obtener_isbn(texto_blockquote):
-    # Buscar la posición inicial de "ISBN:"
-    indice_isbn = texto_blockquote.find("ISBN:")
-    if indice_isbn != -1:
-        # Buscar los delimitadores posteriores a "ISBN:"
+    match = re.search(r'ISBN:\s*', texto_blockquote, re.IGNORECASE)
+    if match:
+        indice_isbn = match.end()  
+        
         indice_v = texto_blockquote.find("v.", indice_isbn)
         indice_ed = texto_blockquote.find("ed:", indice_isbn)
         indice_p = texto_blockquote.find("p.", indice_isbn)
         
-        # Encontrar el primer delimitador para extraer el ISBN
-        topes = [i for i in [indice_v, indice_ed, indice_p] if i != -1]
+        
+        match_volumen = re.search(r'\bVolumen\s+\d+', texto_blockquote[indice_isbn:], re.IGNORECASE)
+        indice_volumen = indice_isbn + match_volumen.start() if match_volumen else -1
+        
+        
+        topes = [i for i in [indice_v, indice_volumen, indice_ed, indice_p] if i != -1]
         if topes:
             primer_tope = min(topes)
-            isbn = texto_blockquote[indice_isbn + len("ISBN:"):primer_tope].strip().strip(',')
+            isbn = texto_blockquote[indice_isbn:primer_tope].strip().strip(',')
         else:
-            isbn = texto_blockquote[indice_isbn + len("ISBN:"):].strip().strip(',')
+            isbn = texto_blockquote[indice_isbn:].strip().strip(',')
         
-        isbn_pattern = re.compile(r'^(?:\d{9}[\dXx]|\d{13})$')
+        
+        isbn_pattern = re.compile(r'^(?:\d{9}[\dXx]|\d{13}|\d+-\d+-\d+-\d+-\d+)$')
         if isbn_pattern.match(isbn) and isbn not in ["0000000000", "0000000000000", "XXXXXXXXXX", "oooooo", "OOOOOO"]:
             return isbn
     return ""
+
+
 def limpiar_nombre_libro(nombre_libro):
     if nombre_libro.startswith('"') and nombre_libro.endswith('"'):
         nombre_libro = nombre_libro[1:-1]
+    nombre_libro = re.sub(r'^\(?\d+(-\d+)*\)?\s*', '', nombre_libro).strip()
+    
+    nombre_libro = re.sub(r'\s*\(\d+(-\d+)*\)\s*', '', nombre_libro).strip()
     
     nombre_libro = re.sub(r'^[,.:).]*', '', nombre_libro).strip()
+    
     contenido_corchetes = re.search(r'\[(.*?)\]', nombre_libro)
     if contenido_corchetes:
         nombre_libro = contenido_corchetes.group(1).strip() 
-    
     return nombre_libro
 
 def obtener_nombre_libro(texto_blockquote):
