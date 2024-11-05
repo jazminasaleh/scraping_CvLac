@@ -34,7 +34,7 @@ os.environ['http_proxy'] = ''
 os.environ['https_proxy'] = ''
 
 # URL del GrupLac, se toman los 152 grupos
-url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=152'
+url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=1'
 
 # Los resultados se van a almacenar en un csv con nombre resultados_grupos
 archivo_salida_json = 'resultados_grupos_json.json'
@@ -114,7 +114,7 @@ def procesar_grupo(fila):
             nombre_grupo = enlace_grupo.text.strip()
             href_enlace = enlace_grupo.get('href')
             numero_url = href_enlace.split('=')[-1]
-            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro={numero_url}'
+            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro=00000000005396'
             # Obtener el nombre del líder y el enlace a su CvLac
             nombre_lider = columnas[3].text.strip()
 
@@ -308,6 +308,8 @@ def procesar_grupo(fila):
                                         nombre_citaciones_td = table_cvlac.find('td', string='Nombre en citaciones')
                                         if nombre_citaciones_td:
                                             nombre_citaciones = nombre_citaciones_td.find_next('td').text.strip()
+                                            # Eliminar asteriscos y texto entre paréntesis
+                                            nombre_citaciones = re.sub(r'\*|\(.*?\)', '', nombre_citaciones).strip()
                                         nacionalidad_td = table_cvlac.find('td', string='Nacionalidad')
                                         if nacionalidad_td:
                                             nacionalidad = nacionalidad_td.find_next('td').text.strip()
@@ -338,7 +340,9 @@ def procesar_grupo(fila):
                                                 if len(celdas_formacion)>1:
                                                     tipo_formacion=celdas_formacion[1].find('b').text.strip()
                                                     contenido= celdas_formacion[1].get_text(separator="|").strip().split("|")
-                                                    institucion=contenido[1].strip() if len(contenido) > 1 else None
+                                                    institucion= contenido[1].strip() if len(contenido) > 1 else None
+                                                    if institucion:
+                                                        institucion = re.sub(r'^[^\w]+', '', institucion).strip()
                                                     titulo_formacion = contenido[2].strip() if len(contenido) > 2 else None
                                                     if titulo_formacion:
                                                         titulo_formacion = re.sub(r'^[\'"\[\]]+|[\'"\[\]]+$', '', titulo_formacion)  
@@ -587,13 +591,16 @@ def procesar_grupo(fila):
                                                                         if texto_blockquote[i].isalnum() or (texto_blockquote[i] == "." and palabra_actual):
                                                                             palabra_actual += texto_blockquote[i]
                                                                         elif texto_blockquote[i] in [","]:
-                                                                            
+                                                                            # Eliminar caracteres especiales al inicio de 'palabra_actual'
+                                                                            palabra_actual = re.sub(r'^[^\w]+', '', palabra_actual).strip()
                                                                             palabras.append(palabra_actual)
                                                                             palabra_actual = ""
                                                                             if len(palabras) == 3:
                                                                                 break
                                                                         elif texto_blockquote[i] == " ":
                                                                             if palabra_actual:
+                                                                                # Eliminar caracteres especiales al inicio de 'palabra_actual'
+                                                                                palabra_actual = re.sub(r'^[^\w]+', '', palabra_actual).strip()
                                                                                 palabras.append(palabra_actual)
                                                                                 palabra_actual = ""
                                                                             else:
@@ -930,6 +937,8 @@ def obtener_paginas(texto_blockquote):
     patron_pagina = r'(?:pages?|p\.)\s*(\d+)\s*-\s*(\d+)'
     resultado_pagina = re.search(patron_pagina, texto_blockquote)
     if resultado_pagina:
+        if resultado_pagina.group(1) == "0" and resultado_pagina.group(2) == "0":
+            return ""
         return f"{resultado_pagina.group(1)}-{resultado_pagina.group(2)}"
     return ""
 
