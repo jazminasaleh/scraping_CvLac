@@ -573,7 +573,7 @@ def procesar_grupo(fila):
                                                                         titulo_publicacion = texto_blockquote[publicacion_comillas_dobles_separadas1 + 1:publicacion_comillas_dobles_separadas2_cuartas]
                                                                         titulo_publicacion = titulo_publicacion.strip('"')
                                                                 
-                                                                titulo_publicacion = re.sub(r'^[.,:;? -]+', '', titulo_publicacion)                                                                    
+                                                                titulo_publicacion = re.sub(r'^[.,:;? -)+]+', '', titulo_publicacion)                                                                    
                                                                 if tipo_publicacion:
                                                                     tipo_publicacion = tipo_publicacion.title()
                                                                 
@@ -587,6 +587,7 @@ def procesar_grupo(fila):
                                                                         if texto_blockquote[i].isalnum() or (texto_blockquote[i] == "." and palabra_actual):
                                                                             palabra_actual += texto_blockquote[i]
                                                                         elif texto_blockquote[i] in [","]:
+                                                                            
                                                                             palabras.append(palabra_actual)
                                                                             palabra_actual = ""
                                                                             if len(palabras) == 3:
@@ -714,6 +715,7 @@ def procesar_grupo(fila):
                                                                                 pais = ""
                                                                     else:
                                                                         titulo_revista = ""
+                                                                titulo_revista = titulo_revista.lstrip(".")
                                                                 issn = ''
                                                                 isbn = ''
                                                                 nombre_libro=''
@@ -917,11 +919,10 @@ def obtener_fasciculo(texto_blockquote):
         else:
             fasciculo = texto_blockquote[indice_fasc + len("fasc."):].strip()
         
-         # Remover el guion inicial si existe
-        if fasciculo.startswith("-"):
-            fasciculo = fasciculo[1:].strip()
+        # Remover paréntesis, guiones y letras, dejando solo números
+        fasciculo = re.sub(r"[^\d]", "", fasciculo)
 
-        return "" if fasciculo in ["N/A", "NA", "N7A", "-", "--", "(N/A)", "(N/A"] or (fasciculo.isdigit() and len(fasciculo) == 4) else fasciculo
+        return "" if fasciculo in ["N/A", "NA", "N7A", "-", "--", "(N/A)", "(N/A", "N / A", "n/a", "N/A|", "No 2"] or (fasciculo.isdigit() and len(fasciculo) == 4) else fasciculo
     return ""
 
 # Obtener el número de pagina
@@ -996,9 +997,13 @@ def obtener_doi(texto_blockquote):
             doi = texto_blockquote[indice_doi_dos + len("doi:"):].strip()
         else:
             doi = texto_blockquote[indice_doi + len("DOI:"):].strip()
-        # Devolver en blanco si DOI es igual a "N/A" o un solo punto "."
-        if doi == "N/A" or doi == ".":
-            return ""
+        patron_doi = re.compile(
+        r'\b(?:DOI:\s*|doi:\s*)?(10\.\d{4,9}/[-._;()/:A-Za-z0-9]+)\b',
+        re.IGNORECASE)
+        if patron_doi.match(doi):
+            doi = doi.replace("DOI:", "").replace("doi:", "").replace("Doi:", "").strip()
+            return doi
+        
     return ""
 
 # Obtener palabras claves de la publicación
