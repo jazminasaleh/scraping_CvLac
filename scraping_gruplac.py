@@ -34,7 +34,7 @@ os.environ['http_proxy'] = ''
 os.environ['https_proxy'] = ''
 
 # URL del GrupLac, se toman los 152 grupos
-url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=1'
+url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=4'
 
 # Los resultados se van a almacenar en un csv con nombre resultados_grupos
 archivo_salida_json = 'resultados_grupos_json.json'
@@ -85,6 +85,7 @@ def formatear_fecha(fecha_texto,meses):
         if len(anio)==4 and anio.isdigit(): 
             return f"01/01/{anio}"  
     return None
+
 # Función para extrear la informcaión de los grupos y sus investigadores
 def procesar_grupo(fila):
     ano_mes_formacion_grupo  = ""
@@ -99,7 +100,6 @@ def procesar_grupo(fila):
     programacion_secundaria_grupo = "" 
     instituciones_avaladas_str = ""
     instituciones_no_avaladas_str=""
-    lineas_investigacion_str = ""
     columnas = fila.find_all('td')
 
     # Verificar si hay mas de tres columnas en la fila
@@ -112,11 +112,12 @@ def procesar_grupo(fila):
         if enlace_grupo:
             # Extraer el texto (nombre del grupo) y el enlace (gruplac)
             nombre_grupo = enlace_grupo.text.strip()
+            
             href_enlace = enlace_grupo.get('href')
             numero_url = href_enlace.split('=')[-1]
-            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro=00000000005396'
+            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro={numero_url}'
             # Obtener el nombre del líder y el enlace a su CvLac
-            nombre_lider = columnas[3].text.strip()
+            nombre_lider = columnas[3].text.strip().title()
 
             cvlac_lider = ''
             enlace_lider = columnas[3].find('a')
@@ -146,7 +147,7 @@ def procesar_grupo(fila):
                 programacion_grupo = ""
                 programacion_secundaria_grupo = "" 
                 instituciones_str = ""
-                lineas_investigacion_str = ""
+                
                 for table in tables:
                     primer_tr = table.find('tr')
                     primer_td = primer_tr.find('td')
@@ -181,14 +182,14 @@ def procesar_grupo(fila):
                                         ciudad_grupo = ""
                                 elif etiqueta == "Página web":
                                     if valor:
-                                        if ("@uptc.edu.co" in valor) or (valor == "-") or (valor == "http:") or (valor == "http://") or (valor == "N/A") or (valor == "N.A."):
+                                        if ("@uptc.edu.co" in valor) or (valor in ["-", "http:", "http://", "N/A", "N.A."]) or not re.match(r'^(https?://|www\.)', valor):
                                             paginaweb_grupo = ""
                                         else:
                                             paginaweb_grupo = valor
                                     else:
                                         paginaweb_grupo = ""
                                 elif etiqueta == "E-mail":
-                                    if valor: 
+                                    if valor and valor.lower() != "null": 
                                         email_grupo = valor
                                     else:
                                         email_grupo = ""
@@ -252,10 +253,10 @@ def procesar_grupo(fila):
                                 linea = celdas[0].text.strip()
                                 linea_limpia = re.sub(r'^\d+\.-?\s*', '', linea)
                                 if linea_limpia:
-                                    lineas_investigacion.append(linea_limpia)
+                                    lineas_investigacion.append(linea_limpia.lower())
                         
                         # Unir todas las líneas en una sola cadena, separadas por comas
-                        lineas_investigacion_str = ", ".join(lineas_investigacion)
+                       
 
                     if primer_td and primer_td.text.strip() == "Integrantes del grupo":
                         filas_tabla = table.find_all('tr')[2:]
@@ -282,7 +283,9 @@ def procesar_grupo(fila):
                                         horas_dedicacion = celdas[2].text.strip()
                                     if len(celdas) >= 4:
                                         inicio_fin_vinculacion = celdas[3].text.strip()
-
+                                        partes = inicio_fin_vinculacion.split(" - ")
+                                        inicio_vinculacion = partes[0] if len(partes) > 0 else ""
+                                        fin_vinculacion = partes[1] if len(partes) > 1 else ""
                                 try:
                                     response_cvlac_integrante = session.get(enlace_cvlac_integrante)
                                     response_cvlac_integrante.raise_for_status()
@@ -768,7 +771,7 @@ def procesar_grupo(fila):
                                                 fila_publicacion = fila_publicacion.find_next_sibling('tr')
                                                
                                     # Agregar los datos del integrante y sus artículos a la lista
-                                    integrantes.append([nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_fin_vinculacion, nombre_citaciones, nacionalidad, sexo, categoria,formacion_academica,area_general_inv,areas_especificas_inv,lineas_activas,lineas_no_activas,publicaciones])
+                                    integrantes.append([nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_vinculacion,fin_vinculacion, nombre_citaciones, nacionalidad, sexo, categoria,formacion_academica,area_general_inv,areas_especificas_inv,lineas_activas,lineas_no_activas,publicaciones])
 
                                 except requests.exceptions.RequestException:
                                     # En caso de error en la solicitud HTTP
@@ -779,9 +782,11 @@ def procesar_grupo(fila):
                 integrantes = []
 
             # Devolver los datos del grupo y sus integrantes
-            return [nombre_grupo, enlace_gruplac_grupo, ano_mes_formacion_grupo, departamento_grupo, ciudad_grupo, paginaweb_grupo, email_grupo, clasificacion_grupo, areas_general_grupo, areas_especificas_grupo, programacion_grupo, programacion_secundaria_grupo, instituciones_avaladas_str,  instituciones_no_avaladas_str, lineas_investigacion_str, nombre_lider, cvlac_lider, integrantes]
+            return [nombre_grupo, enlace_gruplac_grupo, ano_mes_formacion_grupo, departamento_grupo, ciudad_grupo, paginaweb_grupo, email_grupo, clasificacion_grupo, areas_general_grupo, areas_especificas_grupo, programacion_grupo, programacion_secundaria_grupo, instituciones_avaladas_str,  instituciones_no_avaladas_str, lineas_investigacion, nombre_lider, cvlac_lider, integrantes]
 
     return []
+
+
 
 #Obtener ISSN del articulo o textos en publicaciones no cinetificas
 def obtener_issn(texto_blockquote):
@@ -843,8 +848,8 @@ def obtener_isbn(texto_blockquote):
 
 
 def limpiar_nombre_libro(nombre_libro):
-    if nombre_libro.startswith('"') and nombre_libro.endswith('"'):
-        nombre_libro = nombre_libro[1:-1]
+    if nombre_libro.startswith('"') and nombre_libro.count('"') % 2 != 0:
+        nombre_libro = nombre_libro[1:].strip()
     nombre_libro = re.sub(r'^\(?\d+(-\d+)*\)?\s*', '', nombre_libro).strip()
     
     nombre_libro = re.sub(r'\s*\(\d+(-\d+)*\)\s*', '', nombre_libro).strip()
@@ -854,6 +859,7 @@ def limpiar_nombre_libro(nombre_libro):
     contenido_corchetes = re.search(r'\[(.*?)\]', nombre_libro)
     if contenido_corchetes:
         nombre_libro = contenido_corchetes.group(1).strip() 
+    nombre_libro = re.sub(r'[.\s]+$', '.', nombre_libro).strip()
     return nombre_libro
 
 def obtener_nombre_libro(texto_blockquote):
@@ -1122,7 +1128,7 @@ try:
 
         # El nombre de las columnas en el CSV
         writer.writerow(['Nombre del grupo', 'Enlace al GrupLac', 'Fecha de formcación', 'Departamento', 'Ciudad',  'Página web', 'E-mail', 'Clasificación', 'Área de conocimiento general', 'Áreas de conocimiento especificas', 'Programa nacional', 'Programa nacional(secundario)', 'Instituciones avaladas','Instituciones no avaladas',  'Líneas de investigación',  'Nombre del líder', 'Enlace al CvLac líder',
-                         'Nombre del integrante', 'Enlace al CvLac del investigador', 'Nombre en citaciones', 'Vinculación', 'Horas dedicación', 'Inicio - Fin Vinculación',
+                         'Nombre del integrante', 'Enlace al CvLac del investigador', 'Nombre en citaciones', 'Vinculación', 'Horas dedicación', 'Inicio Vinculacion', 'Fin Vinculación',
                          'Nacionalidad', 'Sexo', 'Categoría','Tipo de Formación','Institución','Título Formación','Inicio Formación','Fin Formación','Trabajo de Grado','Area General Investigador','Area Especifica Investigador','Líneas Activas','Líneas no Activas','Título publicación', 'Integrantes involucrados',
                          'Tipo producto', 'Tipo publicación', 'Estado', 'País', 'Titulo revista', 'Nombre Libro','ISSN','ISBN',
                          'Editorial', 'Volumen', 'Fascículo', 'Páginas', 'Año publicación', 'DOI', 'Palabras clave',
@@ -1135,7 +1141,7 @@ try:
         publicaciones_procesadas = [] 
         for datos in resultados:
             if datos:
-                grupo, enlace_grupo,  ano, departamento,  ciudad,  pagina_web, email, clasificacion, areas_general_grupo, areas_especificas_grupo, programa, programa_secundario,  instituciones_avaladas_str, instituciones_no_avaladas_str, lineas_investigacion_str, lider, cvlac_lider, integrantes = datos
+                grupo, enlace_grupo,  ano, departamento,  ciudad,  pagina_web, email, clasificacion, areas_general_grupo, areas_especificas_grupo, programa, programa_secundario,  instituciones_avaladas_str, instituciones_no_avaladas_str, lineas_investigacion, lider, cvlac_lider, integrantes = datos
                 grupo_data = {
                     'Nombre del grupo': grupo,
                     'Enlace al GrupLac': enlace_grupo,
@@ -1151,20 +1157,21 @@ try:
                     'Programa nacional(secundario)': programa_secundario,
                     'Instituciones avaladas': instituciones_avaladas_str,
                     'Instituciones no avaladas': instituciones_no_avaladas_str,
-                    'Líneas de investigación': lineas_investigacion_str,
+                    'Líneas de investigación': lineas_investigacion,
                     'Nombre del líder': lider,
                     'Enlace al CvLac líder': cvlac_lider,
                     'Integrantes': []
                 }
                 for integrante in integrantes:
-                    if len(integrante) == 15:
-                        nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_fin_vinculacion,  nombre_citaciones, nacionalidad, sexo, categoria,formacion_academica,area_general_inv,areas_especificas_inv,lineas_activas,lineas_no_activas,publicaciones = integrante
+                    if len(integrante) == 16:
+                        nombre_integrante, enlace_cvlac_integrante, vinculacion, horas_dedicacion, inicio_vinculacion,fin_vinculacion,  nombre_citaciones, nacionalidad, sexo, categoria,formacion_academica,area_general_inv,areas_especificas_inv,lineas_activas,lineas_no_activas,publicaciones = integrante
                         integrante_data = {
                             'Nombre del integrante': nombre_integrante,
                             'Enlace al CvLac del investigador': enlace_cvlac_integrante,
                             'Vinculación':vinculacion, 
                             'Horas dedicación':horas_dedicacion, 
-                            'Inicio - Fin Vinculación':inicio_fin_vinculacion,
+                            'Inicio Vinculacion':inicio_vinculacion,
+                            'Fin Vinculacion':fin_vinculacion,
                             'Nombre en citaciones': nombre_citaciones,
                             'Nacionalidad': nacionalidad,
                             'Sexo': sexo,
@@ -1191,9 +1198,9 @@ try:
                             grupo, enlace_grupo, ano, departamento, ciudad, pagina_web, email, 
                             clasificacion, areas_general_grupo, areas_especificas_grupo, programa, programa_secundario, 
                             instituciones_avaladas_str, instituciones_no_avaladas_str, 
-                            lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, 
+                            lineas_investigacion, lider, cvlac_lider, nombre_integrante, 
                             enlace_cvlac_integrante, nombre_citaciones, vinculacion, 
-                            horas_dedicacion, inicio_fin_vinculacion, nacionalidad, sexo, 
+                            horas_dedicacion, inicio_vinculacion,fin_vinculacion, nacionalidad, sexo, 
                             categoria, tipo_formacion, institucion, titulo_formacion, 
                             inicio_formacion, fin_formacion, trabajo_grado, area_general_inv,areas_especificas_inv, 
                             lineas_activas, lineas_no_activas
@@ -1238,9 +1245,9 @@ try:
                                 grupo, enlace_grupo, ano, departamento, ciudad, pagina_web, email, 
                                 clasificacion, areas_general_grupo, areas_especificas_grupo, programa, programa_secundario, 
                                 instituciones_avaladas_str, instituciones_no_avaladas_str, 
-                                lineas_investigacion_str, lider, cvlac_lider, nombre_integrante, 
+                                lineas_investigacion, lider, cvlac_lider, nombre_integrante, 
                                 enlace_cvlac_integrante, nombre_citaciones, vinculacion, 
-                                horas_dedicacion, inicio_fin_vinculacion, nacionalidad, sexo, 
+                                horas_dedicacion, inicio_vinculacion,fin_vinculacion, nacionalidad, sexo, 
                                 categoria, "", "", "", "", "", "", area_general_inv,areas_especificas_inv, 
                                 lineas_activas, lineas_no_activas, titulo_publicacion, 
                                 nombres_integrantes, tipo_producto, tipo_publicacion, estado, 
