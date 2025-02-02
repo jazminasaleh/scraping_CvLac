@@ -7,6 +7,7 @@ import csv
 import os
 from concurrent.futures import ThreadPoolExecutor
 import re
+from unidecode import unidecode
 import json
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
@@ -115,7 +116,7 @@ def procesar_grupo(fila):
             
             href_enlace = enlace_grupo.get('href')
             numero_url = href_enlace.split('=')[-1]
-            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro=00000000010336'
+            enlace_gruplac_grupo = f'https://scienti.minciencias.gov.co/gruplac/jsp/visualiza/visualizagr.jsp?nro={numero_url}'
             # Obtener el nombre del líder y el enlace a su CvLac
             nombre_lider = columnas[3].text.strip().title()
 
@@ -380,21 +381,23 @@ def procesar_grupo(fila):
 
                                                 fila_formacion=fila_formacion.find_next_sibling('tr')
                                         #Sección Áreas de Actuación
-                                        
-                                        seccion_area_actuacion=table_cvlac.find('h3',string=['Áreas de actuación'])
+                                        seccion_area_actuacion = table_cvlac.find('h3', string=['Áreas de actuación'])
                                         if seccion_area_actuacion:
-                                            
-                                            fila_area=seccion_area_actuacion.find_parent('tr').find_next_sibling('tr')
-                                            texto_unico = set()  
+                                            fila_area = seccion_area_actuacion.find_parent('tr').find_next_sibling('tr')
+                                            texto_unico = []  # Lista para almacenar áreas únicas, pero permitiendo una aparición
                                             while fila_area:
                                                 celdas_area = fila_area.find_all('td')
                                                 for celda in celdas_area:
-                                                    texto_unico.update(celda.get_text(strip=True).split(' -- ')) 
+                                                    partes_area = celda.get_text(strip=True).split(' -- ')
+                                                    for area in partes_area:
+                                                        if area not in texto_unico:  
+                                                            texto_unico.append(area)
                                                 fila_area = fila_area.find_next_sibling('tr')
-                                            areas_ordenadas = sorted(texto_unico)
+                                            areas_ordenadas = texto_unico
                                             area_general_inv = areas_ordenadas[0] if areas_ordenadas else ""
-                                            areas_especificas_inv = areas_ordenadas[1:] if len(areas_ordenadas) > 1 else []   
-                                        # Sección Líneas de Investigación
+                                            print('area_general_inv',area_general_inv)
+                                            areas_especificas_inv = areas_ordenadas[1:] if len(areas_ordenadas) > 1 else []
+                                            print('area especifica_inv',areas_especificas_inv)
                                         seccion_lineas_investigacion = table_cvlac.find('h3', string=['Líneas de investigación'])
                                         if seccion_lineas_investigacion:
                                             fila_linea = seccion_lineas_investigacion.find_parent('tr').find_next_sibling('tr')
@@ -758,9 +761,8 @@ def procesar_grupo(fila):
                                                                 nombres_integrantes_str = obtener_integrantes(texto_blockquote,  indice_comilla1)
                                                                 nombres_integrantes_lista = nombres_integrantes_str.split(',')
                                                                 
-                                                                
-                                                                publicacion_existente = next((a for a in publicaciones if a[0] == titulo_publicacion), None)
-                                                                                                                              
+                                                                titulo_publicacion = unidecode(titulo_publicacion.lower())
+                                                                publicacion_existente = next((a for a in publicaciones if a[0] == titulo_publicacion), None)                                                  
                                                                 if publicacion_existente is not None:
                                                                     if isinstance(publicacion_existente[1], list):
                                                                         publicacion_existente[1].extend([nombre for nombre in nombres_integrantes_lista if nombre.strip() and nombre.strip() not in publicacion_existente[1]])
