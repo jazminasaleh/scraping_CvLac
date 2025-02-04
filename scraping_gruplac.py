@@ -35,7 +35,7 @@ os.environ['http_proxy'] = ''
 os.environ['https_proxy'] = ''
 
 # URL del GrupLac, se toman los 152 grupos
-url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=1'
+url = 'https://scienti.minciencias.gov.co/ciencia-war/busquedaGrupoXInstitucionGrupos.do?codInst=930&sglPais=&sgDepartamento=&maxRows=152&grupos_tr_=true&grupos_p_=1&grupos_mr_=152'
 
 # Los resultados se van a almacenar en un csv con nombre resultados_grupos
 archivo_salida_json = 'resultados_grupos_json.json'
@@ -395,9 +395,7 @@ def procesar_grupo(fila):
                                                 fila_area = fila_area.find_next_sibling('tr')
                                             areas_ordenadas = texto_unico
                                             area_general_inv = areas_ordenadas[0] if areas_ordenadas else ""
-                                            print('area_general_inv',area_general_inv)
                                             areas_especificas_inv = areas_ordenadas[1:] if len(areas_ordenadas) > 1 else []
-                                            print('area especifica_inv',areas_especificas_inv)
                                         seccion_lineas_investigacion = table_cvlac.find('h3', string=['Líneas de investigación'])
                                         if seccion_lineas_investigacion:
                                             fila_linea = seccion_lineas_investigacion.find_parent('tr').find_next_sibling('tr')
